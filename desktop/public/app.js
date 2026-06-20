@@ -31,6 +31,18 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function fmtAgo(ts) {
+  if (!ts) return 'never';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hr ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'yesterday' : `${d} days ago`;
+}
+
 // Don't overwrite a field the user is currently editing.
 function setInput(el, value) {
   if (document.activeElement !== el) el.value = value;
@@ -39,15 +51,18 @@ function setInput(el, value) {
 function setConnected(isConnected) {
   connected = isConnected;
   $('offlineBanner').classList.toggle('hidden', isConnected);
-  // Disable controls when we can't reach the app.
+  // Disable controls when we can't reach the app. The Trash action buttons are
+  // managed by gallery.js (enabled only when items are selected), so skip them.
+  const managed = new Set(['quit', 'trashRestore', 'trashDeleteForever']);
   document.querySelectorAll('main button, main input').forEach((el) => {
-    if (el.id === 'quit') return;
+    if (managed.has(el.id)) return;
     el.disabled = !isConnected;
   });
   if (!isConnected) {
     const pill = $('statusPill');
     pill.textContent = 'App not running';
     pill.className = 'pill pill-gray';
+    $('statusStrip').classList.add('hidden');
   }
 }
 
@@ -85,6 +100,45 @@ function render(s) {
   $('notifications').checked = s.notificationsEnabled;
   $('notifications').disabled = !s.notificationsAvailable;
   $('notifyUnavailable').classList.toggle('hidden', s.notificationsAvailable);
+
+  renderStatusStrip(s);
+  renderMirror(s);
+}
+
+// Always-visible reassurance line under the header.
+function renderStatusStrip(s) {
+  const strip = $('statusStrip');
+  let warn = false;
+  let text;
+  if (s.fileCount === 0) {
+    text = "No photos backed up yet — once your phone uploads, they'll appear here.";
+  } else {
+    const stale = s.lastUploadAt && Date.now() - s.lastUploadAt > 3 * 86400000;
+    if (stale) {
+      warn = true;
+      text = `⚠ ${s.fileCount.toLocaleString()} photos backed up — but nothing new in ${fmtAgo(s.lastUploadAt)}. Is your phone on and syncing?`;
+    } else {
+      text = `✓ ${s.fileCount.toLocaleString()} photos backed up · last received ${fmtAgo(s.lastUploadAt)}`;
+    }
+  }
+  if (s.mirror && s.mirror.enabled && !s.mirror.connected) {
+    warn = true;
+    text += ' · ⚠ second-copy drive disconnected';
+  }
+  strip.textContent = text;
+  strip.className = 'status-strip' + (warn ? ' warn' : '');
+}
+
+function renderMirror(s) {
+  const m = s.mirror || { enabled: false };
+  $('mirrorOff').classList.toggle('hidden', m.enabled);
+  $('mirrorOn').classList.toggle('hidden', !m.enabled);
+  if (m.enabled) {
+    $('mirrorPath').textContent = m.path;
+    let t = m.connected ? 'Active' : '⚠ Drive not connected';
+    if (m.lastAt) t += ` · last copied ${fmtAgo(m.lastAt)}`;
+    $('mirrorStatusText').textContent = t;
+  }
 }
 
 function renderActivity(entries) {
@@ -170,6 +224,23 @@ $('notifications').onchange = action(async (e) => {
 $('copyUrl').onclick = () => {
   if (lastStatus) navigator.clipboard?.writeText(lastStatus.phoneUrl).then(() => flash('Copied'));
 };
+
+// ---- second copy (mirror) --------------------------------------------------
+const pickMirror = action(async () => {
+  const s = await api('/api/mirror/pick', 'POST');
+  if (!s.cancelled) { render(s); flash('Second copy set up'); }
+});
+$('mirrorPick').onclick = pickMirror;
+$('mirrorChange').onclick = pickMirror;
+$('mirrorClear').onclick = action(async () => {
+  render(await api('/api/mirror/clear', 'POST'));
+  flash('Second copy turned off');
+});
+$('mirrorSync').onclick = action(async () => {
+  const s = await api('/api/mirror/sync', 'POST');
+  render(s);
+  flash(`Copied ${s.copied || 0} new file${(s.copied || 0) === 1 ? '' : 's'}`);
+});
 
 $('quit').onclick = action(async () => {
   if (!confirm('Quit PhotoServer? Backups will stop until you start it again.')) return;
