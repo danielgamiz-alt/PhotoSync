@@ -23,11 +23,18 @@
   function showTab(tab) {
     activeTab = tab;
     $('tabPhotos').classList.toggle('active', tab === 'photos');
+    $('tabTrash').classList.toggle('active', tab === 'trash');
     $('tabSettings').classList.toggle('active', tab === 'settings');
     $('galleryView').classList.toggle('hidden', tab !== 'photos');
+    $('trashView').classList.toggle('hidden', tab !== 'trash');
     $('settingsView').classList.toggle('hidden', tab !== 'settings');
+    // The photo selection bar belongs to the Photos tab only.
+    if (tab !== 'photos') $('selectionBar').classList.add('hidden');
+    else if (selected.size > 0) $('selectionBar').classList.remove('hidden');
+    if (tab === 'trash') loadTrash();
   }
   $('tabPhotos').onclick = () => showTab('photos');
+  $('tabTrash').onclick = () => showTab('trash');
   $('tabSettings').onclick = () => showTab('settings');
 
   // ---- date helpers --------------------------------------------------------
@@ -296,6 +303,98 @@
     else if (e.key === 'ArrowLeft') navLightbox(-1);
     else if (e.key === 'ArrowRight') navLightbox(1);
   });
+
+  // ---- trash (recycle bin) -------------------------------------------------
+  let trashItems = [];
+  const trashSelected = new Set();
+
+  async function loadTrash() {
+    let data;
+    try {
+      data = await fetch('/api/trash').then((r) => r.json());
+    } catch {
+      return;
+    }
+    trashItems = data.items || [];
+    for (const id of [...trashSelected]) {
+      if (!trashItems.some((t) => t.id === id)) trashSelected.delete(id);
+    }
+    renderTrash();
+  }
+
+  function renderTrash() {
+    $('trashEmptyMsg').classList.toggle('hidden', trashItems.length > 0);
+    $('trashGrid').innerHTML = trashItems
+      .map((t) => {
+        if (t.type === 'video') {
+          return `<div class="tile video-tile" data-id="${t.id}">
+            <video preload="metadata" muted src="/media/trash-file?id=${t.id}#t=0.1"></video>
+            <div class="play-badge">${PLAY_SVG}</div>
+            <div class="tile-check">✓</div>
+          </div>`;
+        }
+        return `<div class="tile" data-id="${t.id}">
+          <img loading="lazy" src="/media/trash-thumb?id=${t.id}" alt="">
+          <div class="tile-check">✓</div>
+        </div>`;
+      })
+      .join('');
+    applyTrashSelection();
+  }
+
+  function applyTrashSelection() {
+    document.querySelectorAll('#trashGrid .tile').forEach((el) => {
+      el.classList.toggle('selected', trashSelected.has(el.dataset.id));
+    });
+    const n = trashSelected.size;
+    $('trashSelCount').textContent = n > 0
+      ? `${n} selected`
+      : 'Deleted photos stay here 30 days, then are removed automatically.';
+    $('trashRestore').disabled = n === 0;
+    $('trashDeleteForever').disabled = n === 0;
+  }
+
+  $('trashGrid').addEventListener('click', (e) => {
+    const tile = e.target.closest('.tile');
+    if (!tile) return;
+    const id = tile.dataset.id;
+    if (trashSelected.has(id)) trashSelected.delete(id);
+    else trashSelected.add(id);
+    applyTrashSelection();
+  });
+
+  $('trashRestore').onclick = async () => {
+    const ids = [...trashSelected];
+    if (!ids.length) return;
+    await fetch('/api/trash/restore', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    }).catch(() => {});
+    trashSelected.clear();
+    renderedSig = ''; // force the Photos grid to rebuild with restored items
+    await loadTrash();
+    await loadMedia();
+  };
+
+  $('trashDeleteForever').onclick = async () => {
+    const ids = [...trashSelected];
+    if (!ids.length) return;
+    if (!confirm(`Permanently delete ${ids.length} item${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    await fetch('/api/trash/delete', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    }).catch(() => {});
+    trashSelected.clear();
+    await loadTrash();
+  };
+
+  $('trashEmpty').onclick = async () => {
+    if (trashItems.length === 0) return;
+    if (!confirm('Empty the trash? Everything in it will be permanently deleted.')) return;
+    await fetch('/api/trash/empty', { method: 'POST' }).catch(() => {});
+    trashSelected.clear();
+    await loadTrash();
+  };
 
   // ---- polling -------------------------------------------------------------
   loadMedia();
