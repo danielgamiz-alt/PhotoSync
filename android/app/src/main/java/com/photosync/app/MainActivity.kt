@@ -3,6 +3,7 @@ package com.photosync.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -48,10 +49,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var summaryText: TextView
     private lateinit var emptyText: TextView
     private lateinit var datePill: TextView
+    private lateinit var filterPhotos: TextView
+    private lateinit var filterVideos: TextView
     private lateinit var previewController: VideoPreviewController
 
+    /** All scanned items (the chosen backup source). */
+    private var allItems: List<MediaItem> = emptyList()
+    /** The subset currently shown (after the bottom Photos/Videos filter). */
     private var items: List<MediaItem> = emptyList()
     private var rows: List<GalleryRow> = emptyList()
+
+    /** Bottom filter: false = Photos (photos + videos), true = videos only. */
+    private var videosOnly = false
 
     private val pillHandler = Handler(Looper.getMainLooper())
     private val hidePill = Runnable {
@@ -87,6 +96,12 @@ class MainActivity : AppCompatActivity() {
         swipe = findViewById(R.id.swipeRefresh)
         datePill = findViewById(R.id.datePill)
         grid = findViewById(R.id.photoGrid)
+
+        filterPhotos = findViewById(R.id.filterPhotos)
+        filterVideos = findViewById(R.id.filterVideos)
+        filterPhotos.setOnClickListener { setVideosOnly(false) }
+        filterVideos.setOnClickListener { setVideosOnly(true) }
+        updateFilterUi()
 
         val previewPlayer: PlayerView = findViewById(R.id.previewPlayer)
         val previewChipContainer: View = findViewById(R.id.previewChipContainer)
@@ -190,26 +205,58 @@ class MainActivity : AppCompatActivity() {
     /** Re-scans MediaStore and the upload log, then rebuilds the grid. */
     private fun refresh() {
         lifecycleScope.launch {
-            val scanned = withContext(Dispatchers.IO) {
+            allItems = withContext(Dispatchers.IO) {
                 MediaScanner.itemsForBackup(this@MainActivity, prefs)
                     .sortedByDescending { it.takenAtMs }
             }
-            items = scanned
-            emptyText.visibility = if (scanned.isEmpty()) View.VISIBLE else View.GONE
-            if (scanned.isEmpty()) emptyText.setText(R.string.gallery_empty)
             applyStatuses()
         }
     }
 
-    /** Recomputes each item's badge, then groups into date sections. */
+    /** Switches the bottom Photos/Videos filter and redraws. */
+    private fun setVideosOnly(value: Boolean) {
+        if (videosOnly == value) return
+        videosOnly = value
+        updateFilterUi()
+        previewController.pause()
+        applyStatuses()
+        grid.scrollToPosition(0)
+    }
+
+    private fun updateFilterUi() {
+        styleSegment(filterPhotos, !videosOnly)
+        styleSegment(filterVideos, videosOnly)
+    }
+
+    private fun styleSegment(segment: TextView, selected: Boolean) {
+        if (selected) {
+            segment.setBackgroundResource(R.drawable.pill_selected)
+            segment.setTextColor(ContextCompat.getColor(this, R.color.on_accent))
+        } else {
+            segment.setBackgroundColor(Color.TRANSPARENT)
+            segment.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        }
+    }
+
+    /** Applies the current filter, recomputes badges, and groups into sections. */
     private fun applyStatuses() {
-        if (items.isEmpty() && !hasMediaPermission()) return
+        if (allItems.isEmpty() && !hasMediaPermission()) return
         lifecycleScope.launch {
             val uploaded = withContext(Dispatchers.IO) {
                 UploadLog.get(this@MainActivity).uploadedIds()
             }
             val uploadingId = SyncEvents.uploadingItemId.value
-            val entries = items.map { item ->
+            val shown = if (videosOnly) allItems.filter { it.isVideo } else allItems
+            items = shown
+
+            if (shown.isEmpty()) {
+                emptyText.setText(if (videosOnly) R.string.no_videos else R.string.gallery_empty)
+                emptyText.visibility = View.VISIBLE
+            } else {
+                emptyText.visibility = View.GONE
+            }
+
+            val entries = shown.map { item ->
                 val status = when {
                     item.id == uploadingId -> SyncStatus.UPLOADING
                     item.id in uploaded -> SyncStatus.DONE

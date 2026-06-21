@@ -43,6 +43,11 @@
     <string name="photo">Photo</string>
     <string name="play_video">Play video</string>
 
+    <!-- Bottom gallery filter -->
+    <string name="filter_photos">Photos</string>
+    <string name="filter_videos_only">Videos only</string>
+    <string name="no_videos">No videos found</string>
+
     <!-- Account -->
     <string name="section_account">Account</string>
     <string name="username_hint">Your name (e.g. Alex)</string>

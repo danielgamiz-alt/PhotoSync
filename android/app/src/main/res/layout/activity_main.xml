@@ -28,6 +28,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:padding="1px"
+                android:paddingBottom="76dp"
                 android:scrollbars="none" />
 
             <!-- Single shared preview surface, moved over the active video
@@ -101,6 +102,47 @@
                 android:padding="32dp"
                 android:textAppearance="?attr/textAppearanceBodyLarge"
                 android:visibility="gone" />
+
+            <!-- Bottom filter pill: Photos (all) vs Videos only. Segments are
+                 styled in code (selected = accent fill). -->
+            <LinearLayout
+                android:id="@+id/filterPill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/pill_track"
+                android:elevation="8dp"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <TextView
+                    android:id="@+id/filterPhotos"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="22dp"
+                    android:paddingVertical="9dp"
+                    android:text="@string/filter_photos"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/filterVideos"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="2dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="22dp"
+                    android:paddingVertical="9dp"
+                    android:text="@string/filter_videos_only"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 

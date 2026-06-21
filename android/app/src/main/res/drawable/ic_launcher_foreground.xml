@@ -1,17 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Aperture" launcher icon: a six-blade lens iris in spectrum colors around a
+  hexagonal aperture hole. The hole is left unpainted so the dark adaptive
+  background shows through (the "dark field" that makes the colors pop).
+  Center (54,54), outer radius 32, inner hexagon radius 12; blades are 60°
+  sectors, dividers at 30/90/150/210/270/330° clockwise from top.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Simple camera glyph -->
+
+    <!-- Red (top) -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M40,38 L44,32 L64,32 L68,38 L78,38 C80.2,38 82,39.8 82,42 L82,70 C82,72.2 80.2,74 78,74 L30,74 C27.8,74 26,72.2 26,70 L26,42 C26,39.8 27.8,38 30,38 Z" />
+        android:fillColor="#F2473F"
+        android:pathData="M48,43.608 L38,26.288 A32,32 0 0 1 70,26.288 L60,43.608 Z" />
+    <!-- Orange (top-right) -->
     <path
-        android:fillColor="#1A73E8"
-        android:pathData="M54,44 C61.2,44 67,49.8 67,57 C67,64.2 61.2,70 54,70 C46.8,70 41,64.2 41,57 C41,49.8 46.8,44 54,44 Z" />
+        android:fillColor="#F7972E"
+        android:pathData="M60,43.608 L70,26.288 A32,32 0 0 1 86,54 L66,54 Z" />
+    <!-- Yellow (bottom-right) -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,49 C58.4,49 62,52.6 62,57 C62,61.4 58.4,65 54,65 C49.6,65 46,61.4 46,57 C46,52.6 49.6,49 54,49 Z" />
+        android:fillColor="#F6C72E"
+        android:pathData="M66,54 L86,54 A32,32 0 0 1 70,81.712 L60,64.392 Z" />
+    <!-- Green (bottom) -->
+    <path
+        android:fillColor="#2EC36A"
+        android:pathData="M60,64.392 L70,81.712 A32,32 0 0 1 38,81.712 L48,64.392 Z" />
+    <!-- Cyan (bottom-left) -->
+    <path
+        android:fillColor="#25C4DE"
+        android:pathData="M48,64.392 L38,81.712 A32,32 0 0 1 22,54 L42,54 Z" />
+    <!-- Purple (top-left) -->
+    <path
+        android:fillColor="#7C5CF0"
+        android:pathData="M42,54 L22,54 A32,32 0 0 1 38,26.288 L48,43.608 Z" />
+
+    <!-- Dark separators between blades (the iris "leaves") -->
+    <path
+        android:strokeColor="#0F1012"
+        android:strokeWidth="1.6"
+        android:pathData="M60,43.608 L70,26.288 M66,54 L86,54 M60,64.392 L70,81.712 M48,64.392 L38,81.712 M42,54 L22,54 M48,43.608 L38,26.288" />
 </vector>
