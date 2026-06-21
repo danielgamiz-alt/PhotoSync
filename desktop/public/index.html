@@ -84,30 +84,33 @@
       <div class="card">
         <h2>Backup location</h2>
         <div id="driveWarning" class="warning hidden">⚠ The backup drive isn't connected. Photos can't be saved until it's plugged in.</div>
-        <div class="pathrow"><code id="storagePath">—</code></div>
+        <label class="field">
+          <span>Folder where your photos are saved</span>
+          <input id="storageInput" type="text" spellcheck="false" />
+        </label>
         <div class="diskbar"><div id="diskUsed" class="diskbar-fill"></div></div>
         <p id="diskText" class="muted small">—</p>
         <div class="btnrow">
-          <button id="changeFolder" class="btn">Change folder…</button>
-          <button id="openFolder" class="btn btn-ghost">Open folder</button>
+          <button id="saveStorage" class="btn">Save backup folder</button>
+          <span id="storageHint" class="muted small"></span>
         </div>
+        <p class="muted small">Tip: paste a path like <code>E:\PhotoBackup</code>. It's created if it doesn't exist.</p>
       </div>
 
       <!-- Second copy (mirror) -->
       <div class="card">
         <h2>Second copy</h2>
         <p class="muted small">Also copy every backed-up photo to another folder or drive, so your backup itself is backed up.</p>
-        <div id="mirrorOff">
-          <button id="mirrorPick" class="btn">Choose a second folder…</button>
+        <label class="field">
+          <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
+          <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
+        </label>
+        <p id="mirrorStatusText" class="muted small"></p>
+        <div class="btnrow">
+          <button id="saveMirror" class="btn">Save second copy</button>
+          <button id="mirrorSync" class="btn btn-ghost">Copy now</button>
+          <span id="mirrorHint" class="muted small"></span>
         </div>
-        <div id="mirrorOn" class="hidden">
-          <div class="pathrow"><code id="mirrorPath">—</code></div>
-          <p id="mirrorStatusText" class="muted small">—</p>
-          <div class="btnrow">
-            <button id="mirrorSync" class="btn">Copy now</button>
-            <button id="mirrorChange" class="btn btn-ghost">Change…</button>
-            <button id="mirrorClear" class="btn btn-ghost">Turn off</button>
-          </div>
         </div>
       </div>
 

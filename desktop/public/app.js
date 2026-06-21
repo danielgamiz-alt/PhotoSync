@@ -75,7 +75,7 @@ function render(s) {
   pill.className = 'pill ' + (s.running ? 'pill-green' : 'pill-gray');
 
   $('phoneUrl').textContent = s.phoneUrl;
-  $('storagePath').textContent = s.storagePath;
+  setInput($('storageInput'), s.storagePath);
   $('photoCount').textContent = s.fileCount.toLocaleString();
   $('serverState').textContent = s.running ? 'Running' : 'Stopped';
   $('toggleServer').textContent = s.running ? 'Stop server' : 'Start server';
@@ -131,13 +131,14 @@ function renderStatusStrip(s) {
 
 function renderMirror(s) {
   const m = s.mirror || { enabled: false };
-  $('mirrorOff').classList.toggle('hidden', m.enabled);
-  $('mirrorOn').classList.toggle('hidden', !m.enabled);
+  setInput($('mirrorInput'), m.enabled ? m.path : '');
+  $('mirrorSync').disabled = !m.enabled;
   if (m.enabled) {
-    $('mirrorPath').textContent = m.path;
-    let t = m.connected ? 'Active' : '⚠ Drive not connected';
+    let t = m.connected ? 'On — every photo is copied here too' : '⚠ Drive not connected';
     if (m.lastAt) t += ` · last copied ${fmtAgo(m.lastAt)}`;
     $('mirrorStatusText').textContent = t;
+  } else {
+    $('mirrorStatusText').textContent = 'Off';
   }
 }
 
@@ -196,13 +197,19 @@ $('toggleServer').onclick = action(async () => {
   refreshActivity();
 });
 
-$('changeFolder').onclick = action(async () => {
-  const s = await api('/api/pick-folder', 'POST');
-  if (!s.cancelled) { render(s); flash('Backup folder updated'); }
+$('saveStorage').onclick = async () => {
+  const path = $('storageInput').value.trim();
+  if (!path) { $('storageHint').textContent = 'Enter a folder path'; return; }
+  $('storageHint').textContent = 'Saving…';
+  try {
+    render(await api('/api/storage', 'POST', { path }));
+    $('storageHint').textContent = 'Saved ✓';
+  } catch (e) {
+    $('storageHint').textContent = e.message || 'Could not save';
+  }
+  setTimeout(() => { $('storageHint').textContent = ''; }, 4000);
   refreshActivity();
-});
-
-$('openFolder').onclick = action(() => api('/api/open-folder', 'POST'));
+};
 
 $('saveSettings').onclick = action(async () => {
   const patch = { serverName: $('serverName').value, port: $('port').value };
@@ -226,21 +233,28 @@ $('copyUrl').onclick = () => {
 };
 
 // ---- second copy (mirror) --------------------------------------------------
-const pickMirror = action(async () => {
-  const s = await api('/api/mirror/pick', 'POST');
-  if (!s.cancelled) { render(s); flash('Second copy set up'); }
-});
-$('mirrorPick').onclick = pickMirror;
-$('mirrorChange').onclick = pickMirror;
-$('mirrorClear').onclick = action(async () => {
-  render(await api('/api/mirror/clear', 'POST'));
-  flash('Second copy turned off');
-});
-$('mirrorSync').onclick = action(async () => {
-  const s = await api('/api/mirror/sync', 'POST');
-  render(s);
-  flash(`Copied ${s.copied || 0} new file${(s.copied || 0) === 1 ? '' : 's'}`);
-});
+$('saveMirror').onclick = async () => {
+  const path = $('mirrorInput').value.trim(); // blank = turn off
+  $('mirrorHint').textContent = 'Saving…';
+  try {
+    render(await api('/api/mirror/set', 'POST', { path }));
+    $('mirrorHint').textContent = path ? 'Saved ✓' : 'Turned off';
+  } catch (e) {
+    $('mirrorHint').textContent = e.message || 'Could not save';
+  }
+  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
+};
+$('mirrorSync').onclick = async () => {
+  $('mirrorHint').textContent = 'Copying…';
+  try {
+    const s = await api('/api/mirror/sync', 'POST');
+    render(s);
+    $('mirrorHint').textContent = `Copied ${s.copied || 0} new file${(s.copied || 0) === 1 ? '' : 's'}`;
+  } catch (e) {
+    $('mirrorHint').textContent = e.message || 'Could not copy';
+  }
+  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
+};
 
 $('quit').onclick = action(async () => {
   if (!confirm('Quit PhotoServer? Backups will stop until you start it again.')) return;

@@ -282,7 +282,12 @@ async function main() {
       return getStatus();
     },
     async setStorage(newPath) {
-      config.storagePath = path.resolve(newPath);
+      const resolved = path.resolve(newPath);
+      const root = path.parse(resolved).root;
+      if (root && !fs.existsSync(root)) {
+        throw new Error(`Drive ${root} isn't available — connect it and try again.`);
+      }
+      config.storagePath = resolved;
       persistConfig();
       // Re-point the shared storage at the new folder (gallery + uploader).
       storage = new Storage(config.storagePath);
@@ -371,6 +376,26 @@ async function main() {
       config.mirrorPath = '';
       persistConfig();
       activityLog.add('info', 'Second copy disabled');
+      return getStatus();
+    },
+    // Set (or, with a blank path, turn off) the second-copy folder by path.
+    async setMirror(newPath) {
+      const p = (newPath || '').trim();
+      if (p === '') {
+        config.mirrorPath = '';
+        persistConfig();
+        activityLog.add('info', 'Second copy turned off');
+        return getStatus();
+      }
+      const resolved = path.resolve(p);
+      const root = path.parse(resolved).root;
+      if (root && !fs.existsSync(root)) {
+        throw new Error(`Drive ${root} isn't available — connect it and try again.`);
+      }
+      config.mirrorPath = resolved;
+      persistConfig();
+      activityLog.add('info', `Second copy folder set to ${resolved}`);
+      mirrorSync(); // catch up in the background
       return getStatus();
     },
     async mirrorNow() {

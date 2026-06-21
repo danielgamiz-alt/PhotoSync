@@ -144,6 +144,10 @@ async function route(req, res, deps) {
   if (p === '/api/mirror/clear' && req.method === 'POST') {
     return sendJson(res, 200, await deps.clearMirror());
   }
+  if (p === '/api/mirror/set' && req.method === 'POST') {
+    const body = await readJson(req);
+    return sendJson(res, 200, await deps.setMirror(typeof body.path === 'string' ? body.path : ''));
+  }
   if (p === '/api/mirror/sync' && req.method === 'POST') {
     return sendJson(res, 200, await deps.mirrorNow());
   }
