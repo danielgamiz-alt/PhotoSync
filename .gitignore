@@ -23,3 +23,8 @@ android/app/build/
 android/local.properties
 android/.idea/
 *.apk
+
+# Android release signing — SECRET, never commit
+android/keystore.properties
+android/*.jks
+android/*.keystore
