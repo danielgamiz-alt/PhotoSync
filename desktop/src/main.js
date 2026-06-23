@@ -65,6 +65,7 @@ async function main() {
   // "Last received" time for the status line: newest stored item, updated live.
   let lastUploadAt = 0;
   for (const m of storage.list()) if (m.storedAt > lastUploadAt) lastUploadAt = m.storedAt;
+  let mirrorLastAt = 0;
 
   // ---- wire server events → log, notifications, tray ----------------------
   photoServer.on('log', ({ level, message }) => activityLog.add(level, message));
@@ -73,8 +74,9 @@ async function main() {
 
   let storedBatch = 0;
   let storedTimer = null;
-  photoServer.on('stored', () => {
+  photoServer.on('stored', ({ path: rel }) => {
     lastUploadAt = Date.now();
+    mirrorCopy(rel); // also copy to the second drive, if configured
     storedBatch++;
     syncTrayThrottled();
     clearTimeout(storedTimer);
@@ -128,6 +130,52 @@ async function main() {
     syncTray();
   }
 
+  // ---- second-drive copy (mirror) -----------------------------------------
+  async function mirrorCopy(rel) {
+    if (!config.mirrorPath) return;
+    try {
+      const dst = path.join(config.mirrorPath, rel);
+      await fsp.mkdir(path.dirname(dst), { recursive: true });
+      await fsp.copyFile(path.join(storage.root, rel), dst);
+      mirrorLastAt = Date.now();
+    } catch (e) {
+      activityLog.add('warn', `Second-copy failed for ${rel}: ${e.message}`);
+    }
+  }
+
+  // Copy any files missing from the mirror (catch-up / verify).
+  async function mirrorSync() {
+    if (!config.mirrorPath) return { copied: 0, total: 0 };
+    let copied = 0;
+    const items = storage.list();
+    for (const m of items) {
+      const dst = path.join(config.mirrorPath, m.path);
+      if (!fs.existsSync(dst)) {
+        try {
+          await fsp.mkdir(path.dirname(dst), { recursive: true });
+          await fsp.copyFile(path.join(storage.root, m.path), dst);
+          copied++;
+        } catch (e) {
+          activityLog.add('warn', `Second-copy failed: ${e.message}`);
+        }
+      }
+    }
+    mirrorLastAt = Date.now();
+    activityLog.add('info', `Second copy updated (${copied} new file${copied === 1 ? '' : 's'})`);
+    return { copied, total: items.length };
+  }
+
+  function mirrorStatus() {
+    if (!config.mirrorPath) return { enabled: false };
+    const root = path.parse(config.mirrorPath).root;
+    return {
+      enabled: true,
+      path: config.mirrorPath,
+      connected: !root || fs.existsSync(root),
+      lastAt: mirrorLastAt,
+    };
+  }
+
   // ---- status for the dashboard -------------------------------------------
   async function getStatus() {
     const s = photoServer.stats();
@@ -163,6 +211,7 @@ async function main() {
       hasTray: tray !== null,
       lastUploadAt,
       trashCount: trashStore.count(),
+      mirror: mirrorStatus(),
     };
   }
 
@@ -312,6 +361,46 @@ async function main() {
       await trashStore.emptyAll();
       activityLog.add('info', 'Emptied Trash');
       return { trashCount: trashStore.count() };
+    },
+    // ---- second-drive copy -------------------------------------------------
+    async pickMirror() {
+      const folder = await pickFolder(config.mirrorPath || config.storagePath);
+      if (!folder) return { ...(await getStatus()), cancelled: true };
+      config.mirrorPath = path.resolve(folder);
+      persistConfig();
+      activityLog.add('info', `Second copy folder set to ${config.mirrorPath}`);
+      mirrorSync(); // catch up in the background
+      return getStatus();
+    },
+    async clearMirror() {
+      config.mirrorPath = '';
+      persistConfig();
+      activityLog.add('info', 'Second copy disabled');
+      return getStatus();
+    },
+    // Set (or, with a blank path, turn off) the second-copy folder by path.
+    async setMirror(newPath) {
+      const p = (newPath || '').trim();
+      if (p === '') {
+        config.mirrorPath = '';
+        persistConfig();
+        activityLog.add('info', 'Second copy turned off');
+        return getStatus();
+      }
+      const resolved = path.resolve(p);
+      const root = path.parse(resolved).root;
+      if (root && !fs.existsSync(root)) {
+        throw new Error(`Drive ${root} isn't available — connect it and try again.`);
+      }
+      config.mirrorPath = resolved;
+      persistConfig();
+      activityLog.add('info', `Second copy folder set to ${resolved}`);
+      mirrorSync(); // catch up in the background
+      return getStatus();
+    },
+    async mirrorNow() {
+      const r = await mirrorSync();
+      return { ...(await getStatus()), copied: r.copied };
     },
     async setServerRunning(shouldRun) {
       if (shouldRun && !photoServer.running) await safeStart();

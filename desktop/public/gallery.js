@@ -149,7 +149,7 @@
       .map(
         (g) => `<div class="day" data-daykey="${g.key}">
           <div class="day-header">
-            <div class="day-check" title="Select all">✓</div>
+            <div class="day-check" role="button" title="Select all" aria-label="Select all photos from ${escapeHtml(g.label)}">✓</div>
             <span class="day-title">${escapeHtml(g.label)}</span>
             <span class="day-count">${g.items.length}</span>
           </div>

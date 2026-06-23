@@ -46,6 +46,7 @@
     <string name="setup_step_server">Find your server</string>
     <string name="setup_step_done">Done — your photos back up automatically</string>
     <string name="setup_not_backing_up">Not backing up yet</string>
+    <string name="server_unreachable_summary">Can\'t reach your server — check it\'s on and the address is right in Settings</string>
     <string name="configure_server_first">Set up your server in Settings first</string>
     <string name="status_done">Backed up</string>
     <string name="status_uploading">Uploading…</string>

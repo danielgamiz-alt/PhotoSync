@@ -119,6 +119,7 @@ function render(s) {
   $('notifyUnavailable').classList.toggle('hidden', s.notificationsAvailable);
 
   renderStatusStrip(s);
+  renderMirror(s);
 }
 
 // Always-visible reassurance line under the header.
@@ -142,8 +143,25 @@ function renderStatusStrip(s) {
       text = `✓ ${s.fileCount.toLocaleString()} photos backed up · last received ${fmtAgo(s.lastUploadAt)}`;
     }
   }
+  if (s.mirror && s.mirror.enabled && !s.mirror.connected) {
+    warn = true;
+    text += ' · ⚠ second-copy drive disconnected';
+  }
   strip.textContent = text;
   strip.className = 'status-strip' + (warn ? ' warn' : '');
+}
+
+function renderMirror(s) {
+  const m = s.mirror || { enabled: false };
+  setInput($('mirrorInput'), m.enabled ? m.path : '');
+  $('mirrorSync').disabled = !m.enabled;
+  if (m.enabled) {
+    let t = m.connected ? 'On — every photo is copied here too' : '⚠ Drive not connected';
+    if (m.lastAt) t += ` · last copied ${fmtAgo(m.lastAt)}`;
+    $('mirrorStatusText').textContent = t;
+  } else {
+    $('mirrorStatusText').textContent = 'Off';
+  }
 }
 
 function renderActivity(entries) {
@@ -234,6 +252,30 @@ $('notifications').onchange = action(async (e) => {
 
 $('copyUrl').onclick = () => {
   if (lastStatus) navigator.clipboard?.writeText(lastStatus.phoneUrl).then(() => flash('Copied'));
+};
+
+// ---- second copy (mirror) --------------------------------------------------
+$('saveMirror').onclick = async () => {
+  const path = $('mirrorInput').value.trim(); // blank = turn off
+  $('mirrorHint').textContent = 'Saving…';
+  try {
+    render(await api('/api/mirror/set', 'POST', { path }));
+    $('mirrorHint').textContent = path ? 'Saved ✓' : 'Turned off';
+  } catch (e) {
+    $('mirrorHint').textContent = e.message || 'Could not save';
+  }
+  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
+};
+$('mirrorSync').onclick = async () => {
+  $('mirrorHint').textContent = 'Copying…';
+  try {
+    const s = await api('/api/mirror/sync', 'POST');
+    render(s);
+    $('mirrorHint').textContent = `Copied ${s.copied || 0} new file${(s.copied || 0) === 1 ? '' : 's'}`;
+  } catch (e) {
+    $('mirrorHint').textContent = e.message || 'Could not copy';
+  }
+  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
 };
 
 $('quit').onclick = action(async () => {

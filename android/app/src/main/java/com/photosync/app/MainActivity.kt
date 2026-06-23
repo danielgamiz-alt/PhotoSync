@@ -69,6 +69,9 @@ class MainActivity : AppCompatActivity() {
     /** Bottom filter: false = Photos (photos + videos), true = videos only. */
     private var videosOnly = false
 
+    /** Last-seen "name + server are both set" state; null until first checked. */
+    private var wasConfigured: Boolean? = null
+
     private val pillHandler = Handler(Looper.getMainLooper())
     private val hidePill = Runnable {
         datePill.animate().alpha(0f).setDuration(400).start()
@@ -182,13 +185,31 @@ class MainActivity : AppCompatActivity() {
         val nameDone = prefs.username.isNotEmpty()
         val serverDone = prefs.serverUrl.isNotEmpty()
         val configured = nameDone && serverDone
+        // null on the very first call so a returning, already-configured user
+        // doesn't see the completion flash on every cold start — it only fires
+        // on a genuine not-configured -> configured transition in-session.
+        val justFinished = wasConfigured == false && configured
+        wasConfigured = configured
+
+        if (justFinished) {
+            // The user just completed the last setup step. Flash an all-complete
+            // checklist (every row a ✓) as a brief "you're all set" beat before
+            // the card slides away — otherwise step 3 never earns its ✓.
+            setupButton.visibility = View.GONE
+            setupCard.visibility = View.VISIBLE
+            styleSetupStep(setupStep1, 1, true, R.string.setup_step_name)
+            styleSetupStep(setupStep2, 2, true, R.string.setup_step_server)
+            styleSetupStep(setupStep3, 3, true, R.string.setup_step_done)
+            setupCard.postDelayed({ setupCard.visibility = View.GONE }, 1400)
+            return
+        }
 
         setupButton.visibility = if (configured) View.GONE else View.VISIBLE
         setupCard.visibility = if (configured) View.GONE else View.VISIBLE
 
         styleSetupStep(setupStep1, 1, nameDone, R.string.setup_step_name)
         styleSetupStep(setupStep2, 2, serverDone, R.string.setup_step_server)
-        styleSetupStep(setupStep3, 3, false, R.string.setup_step_done)
+        styleSetupStep(setupStep3, 3, configured, R.string.setup_step_done)
     }
 
     /** Renders one checklist row: a ✓ in accent when done, else its number. */
@@ -325,6 +346,14 @@ class MainActivity : AppCompatActivity() {
                     // Everything is safe — headline number, no progress bar.
                     summaryText.text = getString(R.string.backed_up_all, doneCount)
                     summaryProgress.visibility = View.GONE
+                } else if (uploadingId == null && !serverReachable()) {
+                    // Configured, but pictures aren't moving and the server can't
+                    // be reached (mistyped URL, PC off, wrong WiFi). Say so —
+                    // otherwise the bar silently sits and never advances. An
+                    // active upload already proves reachability, so we only
+                    // probe when nothing is uploading.
+                    summaryText.text = getString(R.string.server_unreachable_summary)
+                    summaryProgress.visibility = View.GONE
                 } else {
                     // Uploads still pending — show progress against the total.
                     summaryText.text = getString(R.string.backed_up_summary, doneCount, total)
@@ -337,6 +366,11 @@ class MainActivity : AppCompatActivity() {
                 summaryProgress.visibility = View.GONE
             }
         }
+    }
+
+    /** True if the configured server answers a health probe (short timeout). */
+    private suspend fun serverReachable(): Boolean = withContext(Dispatchers.IO) {
+        ServerApi(prefs.serverUrl, prefs.apiKey).health() != null
     }
 
     /** Drives the date pill and the video preview together. */

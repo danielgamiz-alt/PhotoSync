@@ -137,6 +137,21 @@ async function route(req, res, deps) {
     return sendJson(res, 200, await deps.emptyTrash());
   }
 
+  // ---- second-drive copy ---------------------------------------------------
+  if (p === '/api/mirror/pick' && req.method === 'POST') {
+    return sendJson(res, 200, await deps.pickMirror());
+  }
+  if (p === '/api/mirror/clear' && req.method === 'POST') {
+    return sendJson(res, 200, await deps.clearMirror());
+  }
+  if (p === '/api/mirror/set' && req.method === 'POST') {
+    const body = await readJson(req);
+    return sendJson(res, 200, await deps.setMirror(typeof body.path === 'string' ? body.path : ''));
+  }
+  if (p === '/api/mirror/sync' && req.method === 'POST') {
+    return sendJson(res, 200, await deps.mirrorNow());
+  }
+
   if (p === '/api/settings' && req.method === 'POST') {
     const body = await readJson(req);
     const patch = {};

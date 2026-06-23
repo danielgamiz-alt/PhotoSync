@@ -54,11 +54,27 @@ async function main() {
   const trashStore = new TrashStore(() => storage.root);
   await trashStore.init();
 
+  const mirrorDir = fs.mkdtempSync(path.join(os.tmpdir(), 'psg-mirror-'));
+  let mirrorPath = '';
+  async function mirrorSync() {
+    if (!mirrorPath) return { copied: 0 };
+    let copied = 0;
+    for (const m of storage.list()) {
+      const dst = path.join(mirrorPath, m.path);
+      if (!fs.existsSync(dst)) {
+        await require('fs/promises').mkdir(path.dirname(dst), { recursive: true });
+        await require('fs/promises').copyFile(path.join(storage.root, m.path), dst);
+        copied++;
+      }
+    }
+    return { copied };
+  }
+
   const deps = {
     host: '127.0.0.1',
     port: PORT,
     publicDir: path.join(__dirname, '..', 'public'),
-    getStatus: async () => ({}),
+    getStatus: async () => ({ mirror: mirrorPath ? { enabled: true, path: mirrorPath } : { enabled: false } }),
     recentActivity: () => [],
     getStorage: () => storage,
     thumbnailer,
@@ -99,6 +115,9 @@ async function main() {
       return { removed, trashCount: trashStore.count() };
     },
     async emptyTrash() { await trashStore.emptyAll(); return { trashCount: trashStore.count() }; },
+    async pickMirror() { mirrorPath = mirrorDir; await mirrorSync(); return deps.getStatus(); },
+    async clearMirror() { mirrorPath = ''; return deps.getStatus(); },
+    async mirrorNow() { const r = await mirrorSync(); return { copied: r.copied }; },
     // unused here:
     applySettings: async () => ({}), setStorage: async () => ({}), pickFolder: async () => null,
     setServerRunning: async () => ({}), setAutostart: async () => ({}), setNotifications: async () => ({}),
@@ -200,9 +219,25 @@ async function main() {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: [trash.items[0].id] }),
     }).then((r) => r.json());
     check('trash: delete-forever removes it', perm.removed === 1 && perm.trashCount === 0, JSON.stringify(perm));
+
+    // ---- second-drive copy (mirror) ---------------------------------------
+    await fetch(`${BASE}/api/mirror/pick`, { method: 'POST' }); // sets folder + catch-up
+    let mirrored = 0;
+    const walk = (p) => {
+      for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+        const fp = path.join(p, e.name);
+        if (e.isDirectory()) walk(fp);
+        else mirrored++;
+      }
+    };
+    walk(mirrorDir);
+    check('mirror: files copied to the second folder', mirrored >= 1, `got ${mirrored}`);
+    const sync = await fetch(`${BASE}/api/mirror/sync`, { method: 'POST' }).then((r) => r.json());
+    check('mirror: copy-now returns a count', typeof sync.copied === 'number');
   } finally {
     await new Promise((res) => server.close(res));
     fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(mirrorDir, { recursive: true, force: true });
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

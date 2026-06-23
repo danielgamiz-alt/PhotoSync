@@ -41,7 +41,7 @@
 
   <!-- Selection action bar (shown when items are selected) -->
   <div id="selectionBar" class="selbar hidden">
-    <button id="selCancel" class="selbar-btn" title="Clear selection">✕</button>
+    <button id="selCancel" class="selbar-btn" title="Clear selection" aria-label="Clear selection">✕</button>
     <span id="selCount">0</span>
     <span class="muted small">selected</span>
     <div class="selbar-spacer"></div>
@@ -110,6 +110,23 @@
         <p class="muted small">Tip: paste a path like <code>E:\PhotoBackup</code>. It's created if it doesn't exist.</p>
       </div>
 
+      <!-- Second copy (mirror) -->
+      <div class="card">
+        <h2>Second copy</h2>
+        <p class="muted small">Also copy every backed-up photo to another folder or drive, so your backup itself is backed up.</p>
+        <p class="note-tip">💡 Use an <b>external hard drive</b> (or another device) — not a folder on this same PC. A second copy only protects you if it's on separate hardware: if this computer is lost, stolen, or breaks, your photos are still safe on the external drive.</p>
+        <label class="field">
+          <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
+          <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
+        </label>
+        <p id="mirrorStatusText" class="muted small"></p>
+        <div class="btnrow">
+          <button id="saveMirror" class="btn">Save second copy</button>
+          <button id="mirrorSync" class="btn btn-ghost">Copy now</button>
+          <span id="mirrorHint" class="muted small"></span>
+        </div>
+      </div>
+
       <!-- Server control -->
       <div class="card">
         <h2>Server</h2>
@@ -160,10 +177,10 @@
 
   <!-- Full-screen viewer -->
   <div id="lightbox" class="lightbox hidden">
-    <button id="lbClose" class="lb-btn lb-close" title="Close (Esc)">✕</button>
-    <button id="lbPrev" class="lb-btn lb-prev" title="Previous (←)">‹</button>
+    <button id="lbClose" class="lb-btn lb-close" title="Close (Esc)" aria-label="Close viewer">✕</button>
+    <button id="lbPrev" class="lb-btn lb-prev" title="Previous (←)" aria-label="Previous photo">‹</button>
     <div id="lbStage" class="lb-stage"></div>
-    <button id="lbNext" class="lb-btn lb-next" title="Next (→)">›</button>
+    <button id="lbNext" class="lb-btn lb-next" title="Next (→)" aria-label="Next photo">›</button>
     <button id="lbDelete" class="lb-btn lb-delete" title="Delete">Delete</button>
   </div>
 
