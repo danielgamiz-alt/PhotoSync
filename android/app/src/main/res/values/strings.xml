@@ -9,7 +9,9 @@
     <string name="test_connection">Test</string>
     <string name="not_connected">Not connected yet</string>
     <string name="searching">Searching for servers on this WiFi…</string>
-    <string name="no_servers_found">No server found. Is it running and on the same WiFi?</string>
+    <string name="no_servers_found">No server found.</string>
+    <string name="no_servers_help">Try this:\n\n(a) Make sure the PhotoServer app is running on your PC.\n(b) Check that both devices are on the same WiFi network.\n(c) Or type the address shown in the PC app\'s Settings into the field above.</string>
+    <string name="try_again">Try again</string>
     <string name="pick_server">Pick a server</string>
     <string name="found_server">Found \"%1$s\" at %2$s</string>
     <string name="api_key_required">This server requires an API key — enter it above.</string>
@@ -33,7 +35,17 @@
 
     <string name="menu_settings">Settings</string>
     <string name="backed_up_summary">%1$d of %2$d backed up</string>
+    <string name="backed_up_all">%1$d photos backed up</string>
     <string name="gallery_empty">No photos found on this device</string>
+
+    <!-- First-run setup: persistent CTA + checklist card shown until the
+         server URL and name are both set. -->
+    <string name="setup_backup">Set up backup</string>
+    <string name="setup_card_title">Finish setting up backup</string>
+    <string name="setup_step_name">Enter your name</string>
+    <string name="setup_step_server">Find your server</string>
+    <string name="setup_step_done">Done — your photos back up automatically</string>
+    <string name="setup_not_backing_up">Not backing up yet</string>
     <string name="configure_server_first">Set up your server in Settings first</string>
     <string name="status_done">Backed up</string>
     <string name="status_uploading">Uploading…</string>
@@ -52,6 +64,7 @@
     <string name="section_account">Account</string>
     <string name="username_hint">Your name (e.g. Alex)</string>
     <string name="account_hint">Your photos are backed up to their own folder on the server, under this name. Each person in your household can use their own name.</string>
+    <string name="privacy_note">🔒 Your photos go only to your own computer at home — nothing is uploaded to the internet or any company.</string>
     <string name="set_name_first">Enter your name in Settings first</string>
 
     <!-- Backup source -->

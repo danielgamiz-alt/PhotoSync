@@ -23,7 +23,10 @@
         <path fill="var(--ap-violet)" d="M42,54 L22,54 A32,32 0 0 1 38,26.288 L48,43.608 Z"/>
         <path fill="none" stroke="#15161a" stroke-width="1.6" d="M60,43.608 L70,26.288 M66,54 L86,54 M60,64.392 L70,81.712 M48,64.392 L38,81.712 M42,54 L22,54 M48,43.608 L38,26.288"/>
       </svg>
-      <h1>PhotoServer</h1>
+      <div class="brand-text">
+        <h1>PhotoServer</h1>
+        <span class="brand-privacy">🔒 Stored only on this PC — nothing leaves your home</span>
+      </div>
     </div>
     <nav class="tabs">
       <button id="tabPhotos" class="tab active">Photos</button>
@@ -34,7 +37,7 @@
   </header>
 
   <!-- Always-visible reassurance line -->
-  <div id="statusStrip" class="status-strip hidden"></div>
+  <div id="statusStrip" class="status-strip">Connecting to the PhotoServer app…</div>
 
   <!-- Selection action bar (shown when items are selected) -->
   <div id="selectionBar" class="selbar hidden">
@@ -105,23 +108,6 @@
           <span id="storageHint" class="muted small"></span>
         </div>
         <p class="muted small">Tip: paste a path like <code>E:\PhotoBackup</code>. It's created if it doesn't exist.</p>
-      </div>
-
-      <!-- Second copy (mirror) -->
-      <div class="card">
-        <h2>Second copy</h2>
-        <p class="muted small">Also copy every backed-up photo to another folder or drive, so your backup itself is backed up.</p>
-        <label class="field">
-          <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
-          <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
-        </label>
-        <p id="mirrorStatusText" class="muted small"></p>
-        <div class="btnrow">
-          <button id="saveMirror" class="btn">Save second copy</button>
-          <button id="mirrorSync" class="btn btn-ghost">Copy now</button>
-          <span id="mirrorHint" class="muted small"></span>
-        </div>
-        </div>
       </div>
 
       <!-- Server control -->
