@@ -94,6 +94,26 @@
             android:text="@string/not_connected"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
+        <TextView
+            android:id="@+id/connectionHelp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:padding="12dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:text="@string/no_servers_help"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/tryAgainButton"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/try_again"
+            android:visibility="gone" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
