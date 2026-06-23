@@ -15,12 +15,34 @@
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp">
 
-        <TextView
-            android:id="@+id/summaryText"
+        <!-- Backup status: a bold headline number with a thin progress bar that
+             only appears while uploads are still pending. This is the app's main
+             reassurance, so it reads as a title, not a caption. -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/summaryText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/summaryProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginEnd="4dp"
+                android:max="100"
+                android:progressTint="@color/accent"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/setupButton"
