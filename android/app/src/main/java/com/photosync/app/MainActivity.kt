@@ -51,6 +51,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var datePill: TextView
     private lateinit var filterPhotos: TextView
     private lateinit var filterVideos: TextView
+    private lateinit var setupButton: View
+    private lateinit var setupCard: View
+    private lateinit var setupStep1: TextView
+    private lateinit var setupStep2: TextView
+    private lateinit var setupStep3: TextView
     private lateinit var previewController: VideoPreviewController
 
     /** All scanned items (the chosen backup source). */
@@ -103,6 +108,17 @@ class MainActivity : AppCompatActivity() {
         filterVideos.setOnClickListener { setVideosOnly(true) }
         updateFilterUi()
 
+        setupButton = findViewById(R.id.setupButton)
+        setupCard = findViewById(R.id.setupCard)
+        setupStep1 = findViewById(R.id.setupStep1)
+        setupStep2 = findViewById(R.id.setupStep2)
+        setupStep3 = findViewById(R.id.setupStep3)
+        val openSettings = View.OnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+        setupButton.setOnClickListener(openSettings)
+        setupCard.setOnClickListener(openSettings)
+
         val previewPlayer: PlayerView = findViewById(R.id.previewPlayer)
         val previewChipContainer: View = findViewById(R.id.previewChipContainer)
         val previewDurationText: TextView = findViewById(R.id.previewDurationText)
@@ -144,12 +160,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        updateSetupState()
         ensureMediaPermission()
     }
 
     override fun onResume() {
         super.onResume()
+        // Reflect any changes made in Settings (name / server) immediately.
+        updateSetupState()
         if (hasMediaPermission()) refresh()
+    }
+
+    /**
+     * Shows the persistent "Set up backup" CTA and the first-run checklist card
+     * until both the account name and the server URL are set, then hides them.
+     */
+    private fun updateSetupState() {
+        val nameDone = prefs.username.isNotEmpty()
+        val serverDone = prefs.serverUrl.isNotEmpty()
+        val configured = nameDone && serverDone
+
+        setupButton.visibility = if (configured) View.GONE else View.VISIBLE
+        setupCard.visibility = if (configured) View.GONE else View.VISIBLE
+
+        styleSetupStep(setupStep1, 1, nameDone, R.string.setup_step_name)
+        styleSetupStep(setupStep2, 2, serverDone, R.string.setup_step_server)
+        styleSetupStep(setupStep3, 3, false, R.string.setup_step_done)
+    }
+
+    /** Renders one checklist row: a ✓ in accent when done, else its number. */
+    private fun styleSetupStep(step: TextView, number: Int, done: Boolean, labelRes: Int) {
+        val marker = if (done) "✓" else number.toString()
+        step.text = "$marker  ${getString(labelRes)}"
+        val color = if (done) R.color.accent else R.color.text_primary
+        step.setTextColor(ContextCompat.getColor(this, color))
     }
 
     override fun onStop() {
@@ -270,8 +314,13 @@ class MainActivity : AppCompatActivity() {
             // gone, so without this the pill wouldn't show until the user scrolls).
             rows.firstOrNull()?.sectionLabel?.let { flashDatePill(it) }
 
-            val doneCount = entries.count { it.status == SyncStatus.DONE }
-            summaryText.text = getString(R.string.backed_up_summary, doneCount, entries.size)
+            val configured = prefs.username.isNotEmpty() && prefs.serverUrl.isNotEmpty()
+            summaryText.text = if (configured) {
+                val doneCount = entries.count { it.status == SyncStatus.DONE }
+                getString(R.string.backed_up_summary, doneCount, entries.size)
+            } else {
+                getString(R.string.setup_not_backing_up)
+            }
         }
     }
 

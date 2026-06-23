@@ -34,6 +34,15 @@
     <string name="menu_settings">Settings</string>
     <string name="backed_up_summary">%1$d of %2$d backed up</string>
     <string name="gallery_empty">No photos found on this device</string>
+
+    <!-- First-run setup: persistent CTA + checklist card shown until the
+         server URL and name are both set. -->
+    <string name="setup_backup">Set up backup</string>
+    <string name="setup_card_title">Finish setting up backup</string>
+    <string name="setup_step_name">Enter your name</string>
+    <string name="setup_step_server">Find your server</string>
+    <string name="setup_step_done">Done — your photos back up automatically</string>
+    <string name="setup_not_backing_up">Not backing up yet</string>
     <string name="configure_server_first">Set up your server in Settings first</string>
     <string name="status_done">Backed up</string>
     <string name="status_uploading">Uploading…</string>
