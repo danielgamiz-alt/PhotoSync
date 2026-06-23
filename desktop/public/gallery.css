@@ -6,7 +6,7 @@
   border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer;
 }
 .tab:hover { background: rgba(127, 127, 127, 0.12); }
-.tab.active { color: var(--accent); background: rgba(26, 115, 232, 0.12); }
+.tab.active { color: var(--accent); background: rgba(124, 92, 240, 0.12); }
 
 /* ---- gallery layout ---- */
 #offlineBanner { margin: 12px; }

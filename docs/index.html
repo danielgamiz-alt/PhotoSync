@@ -4,11 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PhotoSync — Download for Android</title>
+<link rel="stylesheet" href="tokens.css">
 <style>
-  :root {
-    --bg: #0f1012; --surface: #1a1c20; --surface2: #212429;
-    --text: #ecedef; --muted: #a7abb3; --accent: #7c5cf0; --line: #2e323a;
-  }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
@@ -34,7 +31,7 @@
   section { margin-top: 44px; }
   h2 { font-size: 20px; font-weight: 600; margin: 0 0 16px; }
   .step {
-    display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--line);
+    display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
     border-radius: 14px; padding: 16px; margin-bottom: 12px;
   }
   .num {
@@ -44,7 +41,7 @@
   }
   .step h3 { margin: 2px 0 4px; font-size: 16px; font-weight: 600; }
   .step p { margin: 0; color: var(--muted); font-size: 15px; }
-  .note { background: var(--surface2); border-radius: 12px; padding: 14px 16px; color: var(--muted); font-size: 14px; }
+  .note { background: var(--surface-2); border-radius: 12px; padding: 14px 16px; color: var(--muted); font-size: 14px; }
   .note b { color: var(--text); font-weight: 600; }
   a { color: #a98bff; }
   footer { margin-top: 48px; text-align: center; color: var(--muted); font-size: 13px; }
