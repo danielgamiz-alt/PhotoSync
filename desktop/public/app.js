@@ -60,9 +60,13 @@ function setConnected(isConnected) {
   });
   if (!isConnected) {
     const pill = $('statusPill');
-    pill.textContent = 'App not running';
+    pill.textContent = '⚠ App not running';
     pill.className = 'pill pill-gray';
-    $('statusStrip').classList.add('hidden');
+    // Keep the reassurance line visible — an empty/hidden strip is itself
+    // ambiguous. Tell the user plainly that we can't reach the app.
+    const strip = $('statusStrip');
+    strip.textContent = "⚠ Can't reach the PhotoServer app — it may not be running.";
+    strip.className = 'status-strip warn';
   }
 }
 
@@ -70,9 +74,22 @@ function render(s) {
   lastStatus = s;
   setConnected(true);
 
+  // Pill: always a worded state paired with an icon, so it doesn't rely on
+  // colour alone (fails for colour-blind users) and "grey" actually says why.
   const pill = $('statusPill');
-  pill.textContent = s.running ? 'Running' : 'Stopped';
-  pill.className = 'pill ' + (s.running ? 'pill-green' : 'pill-gray');
+  let pillCls, pillText;
+  if (!s.running) {
+    pillCls = 'pill-gray';
+    pillText = '⏸ Server stopped';
+  } else if (!s.driveConnected) {
+    pillCls = 'pill-warn';
+    pillText = '⚠ Drive disconnected';
+  } else {
+    pillCls = 'pill-green';
+    pillText = '✓ Running';
+  }
+  pill.textContent = pillText;
+  pill.className = 'pill ' + pillCls;
 
   $('phoneUrl').textContent = s.phoneUrl;
   setInput($('storageInput'), s.storagePath);
@@ -102,7 +119,6 @@ function render(s) {
   $('notifyUnavailable').classList.toggle('hidden', s.notificationsAvailable);
 
   renderStatusStrip(s);
-  renderMirror(s);
 }
 
 // Always-visible reassurance line under the header.
@@ -110,6 +126,11 @@ function renderStatusStrip(s) {
   const strip = $('statusStrip');
   let warn = false;
   let text;
+  if (!s.driveConnected) {
+    strip.textContent = "⚠ Backup drive disconnected — photos can't be saved until it's plugged back in.";
+    strip.className = 'status-strip warn';
+    return;
+  }
   if (s.fileCount === 0) {
     text = "No photos backed up yet — once your phone uploads, they'll appear here.";
   } else {
@@ -121,25 +142,8 @@ function renderStatusStrip(s) {
       text = `✓ ${s.fileCount.toLocaleString()} photos backed up · last received ${fmtAgo(s.lastUploadAt)}`;
     }
   }
-  if (s.mirror && s.mirror.enabled && !s.mirror.connected) {
-    warn = true;
-    text += ' · ⚠ second-copy drive disconnected';
-  }
   strip.textContent = text;
   strip.className = 'status-strip' + (warn ? ' warn' : '');
-}
-
-function renderMirror(s) {
-  const m = s.mirror || { enabled: false };
-  setInput($('mirrorInput'), m.enabled ? m.path : '');
-  $('mirrorSync').disabled = !m.enabled;
-  if (m.enabled) {
-    let t = m.connected ? 'On — every photo is copied here too' : '⚠ Drive not connected';
-    if (m.lastAt) t += ` · last copied ${fmtAgo(m.lastAt)}`;
-    $('mirrorStatusText').textContent = t;
-  } else {
-    $('mirrorStatusText').textContent = 'Off';
-  }
 }
 
 function renderActivity(entries) {
@@ -230,30 +234,6 @@ $('notifications').onchange = action(async (e) => {
 
 $('copyUrl').onclick = () => {
   if (lastStatus) navigator.clipboard?.writeText(lastStatus.phoneUrl).then(() => flash('Copied'));
-};
-
-// ---- second copy (mirror) --------------------------------------------------
-$('saveMirror').onclick = async () => {
-  const path = $('mirrorInput').value.trim(); // blank = turn off
-  $('mirrorHint').textContent = 'Saving…';
-  try {
-    render(await api('/api/mirror/set', 'POST', { path }));
-    $('mirrorHint').textContent = path ? 'Saved ✓' : 'Turned off';
-  } catch (e) {
-    $('mirrorHint').textContent = e.message || 'Could not save';
-  }
-  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
-};
-$('mirrorSync').onclick = async () => {
-  $('mirrorHint').textContent = 'Copying…';
-  try {
-    const s = await api('/api/mirror/sync', 'POST');
-    render(s);
-    $('mirrorHint').textContent = `Copied ${s.copied || 0} new file${(s.copied || 0) === 1 ? '' : 's'}`;
-  } catch (e) {
-    $('mirrorHint').textContent = e.message || 'Could not copy';
-  }
-  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
 };
 
 $('quit').onclick = action(async () => {

@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.format.DateUtils
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -28,6 +29,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var serverUrlInput: EditText
     private lateinit var apiKeyInput: EditText
     private lateinit var connectionStatus: TextView
+    private lateinit var connectionHelp: TextView
+    private lateinit var tryAgainButton: Button
     private lateinit var syncStatus: TextView
     private lateinit var autoSyncSwitch: SwitchCompat
     private lateinit var videosSwitch: SwitchCompat
@@ -51,6 +54,8 @@ class SettingsActivity : AppCompatActivity() {
         serverUrlInput = findViewById(R.id.serverUrlInput)
         apiKeyInput = findViewById(R.id.apiKeyInput)
         connectionStatus = findViewById(R.id.connectionStatus)
+        connectionHelp = findViewById(R.id.connectionHelp)
+        tryAgainButton = findViewById(R.id.tryAgainButton)
         syncStatus = findViewById(R.id.syncStatus)
         autoSyncSwitch = findViewById(R.id.autoSyncSwitch)
         videosSwitch = findViewById(R.id.videosSwitch)
@@ -69,6 +74,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.discoverButton).setOnClickListener { discoverServers() }
         findViewById<Button>(R.id.testButton).setOnClickListener { testConnection() }
         findViewById<Button>(R.id.syncNowButton).setOnClickListener { syncNow() }
+        tryAgainButton.setOnClickListener { discoverServers() }
 
         autoSyncSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.autoSyncEnabled = checked
@@ -135,10 +141,12 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun discoverServers() {
         connectionStatus.setText(R.string.searching)
+        hideConnectionHelp()
         lifecycleScope.launch {
             val servers = withContext(Dispatchers.IO) { ServerDiscovery.discover(this@SettingsActivity) }
             if (servers.isEmpty()) {
                 connectionStatus.setText(R.string.no_servers_found)
+                showConnectionHelp()
                 return@launch
             }
             if (servers.size == 1) {
@@ -153,7 +161,21 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun showConnectionHelp() {
+        connectionHelp.visibility = View.VISIBLE
+        tryAgainButton.visibility = View.VISIBLE
+        // Keep the URL field focused so the user can type the address from
+        // the PC app's Settings without an extra tap.
+        serverUrlInput.requestFocus()
+    }
+
+    private fun hideConnectionHelp() {
+        connectionHelp.visibility = View.GONE
+        tryAgainButton.visibility = View.GONE
+    }
+
     private fun applyServer(server: DiscoveredServer) {
+        hideConnectionHelp()
         serverUrlInput.setText(server.baseUrl)
         prefs.serverUrl = server.baseUrl
         prefs.serverName = server.name

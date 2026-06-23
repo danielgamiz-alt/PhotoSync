@@ -30,7 +30,9 @@ header {
 }
 
 .brand { display: flex; align-items: center; gap: 12px; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; }
 .brand h1 { font-size: 20px; margin: 0; }
+.brand-privacy { font-size: 12px; color: var(--muted); }
 .logo { width: 28px; height: 28px; display: block; flex: 0 0 auto; }
 
 /* Full-width so the gallery fills the screen. The Settings panel re-centers
@@ -58,6 +60,7 @@ main {
 }
 .pill-green { background: var(--green); }
 .pill-gray { background: var(--gray); }
+.pill-warn { background: var(--danger); }
 
 code {
   font-family: "Cascadia Code", Consolas, monospace;

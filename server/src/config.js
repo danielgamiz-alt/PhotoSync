@@ -17,9 +17,6 @@ const DEFAULTS = {
   // Optional shared secret. If non-empty, clients must send it
   // as the "x-api-key" header on every request.
   apiKey: '',
-  // Optional second folder/drive that backups are also copied to, so the
-  // backup itself has a backup. Empty = disabled.
-  mirrorPath: '',
 };
 
 function load(argv) {
@@ -64,7 +61,6 @@ function save(config) {
     storagePath: config.storagePath,
     serverName: config.serverName,
     apiKey: config.apiKey,
-    mirrorPath: config.mirrorPath || '',
   };
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(persistable, null, 2) + '\n');
   return persistable;

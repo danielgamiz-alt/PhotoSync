@@ -11,6 +11,7 @@ import android.os.Looper
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,10 +48,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutManager: GridLayoutManager
     private lateinit var swipe: SwipeRefreshLayout
     private lateinit var summaryText: TextView
+    private lateinit var summaryProgress: ProgressBar
     private lateinit var emptyText: TextView
     private lateinit var datePill: TextView
     private lateinit var filterPhotos: TextView
     private lateinit var filterVideos: TextView
+    private lateinit var setupButton: View
+    private lateinit var setupCard: View
+    private lateinit var setupStep1: TextView
+    private lateinit var setupStep2: TextView
+    private lateinit var setupStep3: TextView
     private lateinit var previewController: VideoPreviewController
 
     /** All scanned items (the chosen backup source). */
@@ -92,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         prefs = SyncPrefs(this)
 
         summaryText = findViewById(R.id.summaryText)
+        summaryProgress = findViewById(R.id.summaryProgress)
         emptyText = findViewById(R.id.emptyText)
         swipe = findViewById(R.id.swipeRefresh)
         datePill = findViewById(R.id.datePill)
@@ -102,6 +110,17 @@ class MainActivity : AppCompatActivity() {
         filterPhotos.setOnClickListener { setVideosOnly(false) }
         filterVideos.setOnClickListener { setVideosOnly(true) }
         updateFilterUi()
+
+        setupButton = findViewById(R.id.setupButton)
+        setupCard = findViewById(R.id.setupCard)
+        setupStep1 = findViewById(R.id.setupStep1)
+        setupStep2 = findViewById(R.id.setupStep2)
+        setupStep3 = findViewById(R.id.setupStep3)
+        val openSettings = View.OnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+        setupButton.setOnClickListener(openSettings)
+        setupCard.setOnClickListener(openSettings)
 
         val previewPlayer: PlayerView = findViewById(R.id.previewPlayer)
         val previewChipContainer: View = findViewById(R.id.previewChipContainer)
@@ -144,12 +163,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        updateSetupState()
         ensureMediaPermission()
     }
 
     override fun onResume() {
         super.onResume()
+        // Reflect any changes made in Settings (name / server) immediately.
+        updateSetupState()
         if (hasMediaPermission()) refresh()
+    }
+
+    /**
+     * Shows the persistent "Set up backup" CTA and the first-run checklist card
+     * until both the account name and the server URL are set, then hides them.
+     */
+    private fun updateSetupState() {
+        val nameDone = prefs.username.isNotEmpty()
+        val serverDone = prefs.serverUrl.isNotEmpty()
+        val configured = nameDone && serverDone
+
+        setupButton.visibility = if (configured) View.GONE else View.VISIBLE
+        setupCard.visibility = if (configured) View.GONE else View.VISIBLE
+
+        styleSetupStep(setupStep1, 1, nameDone, R.string.setup_step_name)
+        styleSetupStep(setupStep2, 2, serverDone, R.string.setup_step_server)
+        styleSetupStep(setupStep3, 3, false, R.string.setup_step_done)
+    }
+
+    /** Renders one checklist row: a ✓ in accent when done, else its number. */
+    private fun styleSetupStep(step: TextView, number: Int, done: Boolean, labelRes: Int) {
+        val marker = if (done) "✓" else number.toString()
+        step.text = "$marker  ${getString(labelRes)}"
+        val color = if (done) R.color.accent else R.color.text_primary
+        step.setTextColor(ContextCompat.getColor(this, color))
     }
 
     override fun onStop() {
@@ -270,8 +317,25 @@ class MainActivity : AppCompatActivity() {
             // gone, so without this the pill wouldn't show until the user scrolls).
             rows.firstOrNull()?.sectionLabel?.let { flashDatePill(it) }
 
-            val doneCount = entries.count { it.status == SyncStatus.DONE }
-            summaryText.text = getString(R.string.backed_up_summary, doneCount, entries.size)
+            val configured = prefs.username.isNotEmpty() && prefs.serverUrl.isNotEmpty()
+            if (configured) {
+                val doneCount = entries.count { it.status == SyncStatus.DONE }
+                val total = entries.size
+                if (doneCount >= total) {
+                    // Everything is safe — headline number, no progress bar.
+                    summaryText.text = getString(R.string.backed_up_all, doneCount)
+                    summaryProgress.visibility = View.GONE
+                } else {
+                    // Uploads still pending — show progress against the total.
+                    summaryText.text = getString(R.string.backed_up_summary, doneCount, total)
+                    summaryProgress.max = total
+                    summaryProgress.progress = doneCount
+                    summaryProgress.visibility = View.VISIBLE
+                }
+            } else {
+                summaryText.text = getString(R.string.setup_not_backing_up)
+                summaryProgress.visibility = View.GONE
+            }
         }
     }
 
