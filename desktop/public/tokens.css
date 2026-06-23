@@ -1,0 +1,36 @@
+/* PhotoServer / PhotoSync — shared brand tokens (single source of truth).
+ *
+ * This file is the CANONICAL copy. The desktop dashboard serves its own copy
+ * from desktop/public/tokens.css; keep them identical by running
+ *   cd desktop && npm run sync-tokens
+ * after editing this file. Both the desktop app and this landing page link it,
+ * so the brand (purple aperture accent, dark surfaces) stays coherent.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Brand accent — the purple of the aperture logo */
+  --accent: #7c5cf0;
+  --accent-hover: #8f73f2;
+  --on-accent: #ffffff;
+
+  /* Surfaces (dark by default, matching the phone app + landing) */
+  --bg: #0f1012;
+  --surface: #1a1c20;
+  --surface-2: #212429;
+  --text: #ecedef;
+  --muted: #a7abb3;
+  --border: #2e323a;
+
+  /* Status */
+  --danger: #f2473f;
+  --success: #2ec36a;
+
+  /* Aperture petal colours (rainbow logo) */
+  --ap-red: #f2473f;
+  --ap-orange: #f7972e;
+  --ap-yellow: #f6c72e;
+  --ap-green: #2ec36a;
+  --ap-cyan: #25c4de;
+  --ap-violet: #7c5cf0;
+}

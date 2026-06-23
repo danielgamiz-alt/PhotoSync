@@ -1,25 +1,11 @@
+/* Brand tokens (colours, accent, surfaces) come from tokens.css, shared with
+   the landing page. Dark is the default there. Only desktop-specific tokens
+   that the landing doesn't need live here. */
 :root {
-  --bg: #f4f5f7;
-  --card: #ffffff;
-  --text: #1d2127;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --accent: #1a73e8;
-  --green: #2ea043;
+  --card: var(--surface);
+  --green: var(--success);
   --gray: #8c9299;
-  --danger: #d93025;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #15171c;
-    --card: #1e2127;
-    --text: #e6e8eb;
-    --muted: #9aa0a6;
-    --border: #2c3038;
-    --shadow: none;
-  }
+  --shadow: none;
 }
 
 * { box-sizing: border-box; }
@@ -45,11 +31,7 @@ header {
 
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand h1 { font-size: 20px; margin: 0; }
-.logo {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--green);
-  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 7px var(--green);
-}
+.logo { width: 28px; height: 28px; display: block; flex: 0 0 auto; }
 
 /* Full-width so the gallery fills the screen. The Settings panel re-centers
    itself with its own max-width (.settings-wrap). */
