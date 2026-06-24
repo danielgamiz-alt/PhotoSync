@@ -97,17 +97,25 @@
       <div class="card">
         <h2>Backup location</h2>
         <div id="driveWarning" class="warning hidden">⚠ The backup drive isn't connected. Photos can't be saved until it's plugged in.</div>
-        <label class="field">
-          <span>Folder where your photos are saved</span>
-          <input id="storageInput" type="text" spellcheck="false" />
-        </label>
+        <p class="muted small">Where your photos are saved on this PC:</p>
+        <div class="pathrow"><code id="storagePathDisplay">—</code></div>
         <div class="diskbar"><div id="diskUsed" class="diskbar-fill"></div></div>
         <p id="diskText" class="muted small">—</p>
         <div class="btnrow">
-          <button id="saveStorage" class="btn">Save backup folder</button>
+          <button id="chooseFolder" class="btn">Choose folder…</button>
           <span id="storageHint" class="muted small"></span>
         </div>
-        <p class="muted small">Tip: paste a path like <code>E:\PhotoBackup</code>. It's created if it doesn't exist.</p>
+        <details>
+          <summary class="muted small">Or type a path manually</summary>
+          <label class="field">
+            <span>Folder path</span>
+            <input id="storageInput" type="text" spellcheck="false" placeholder="e.g. E:\PhotoBackup" />
+          </label>
+          <div class="btnrow">
+            <button id="saveStorage" class="btn btn-ghost">Save typed path</button>
+          </div>
+          <p class="muted small">A path like <code>E:\PhotoBackup</code> is created if it doesn't exist.</p>
+        </details>
       </div>
 
       <!-- Second copy (mirror) -->
@@ -115,16 +123,23 @@
         <h2>Second copy</h2>
         <p class="muted small">Also copy every backed-up photo to another folder or drive, so your backup itself is backed up.</p>
         <p class="note-tip">💡 Use an <b>external hard drive</b> (or another device) — not a folder on this same PC. A second copy only protects you if it's on separate hardware: if this computer is lost, stolen, or breaks, your photos are still safe on the external drive.</p>
-        <label class="field">
-          <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
-          <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
-        </label>
         <p id="mirrorStatusText" class="muted small"></p>
         <div class="btnrow">
-          <button id="saveMirror" class="btn">Save second copy</button>
+          <button id="chooseMirror" class="btn">Choose folder…</button>
           <button id="mirrorSync" class="btn btn-ghost">Copy now</button>
+          <button id="mirrorOff" class="btn btn-ghost hidden">Turn off</button>
           <span id="mirrorHint" class="muted small"></span>
         </div>
+        <details>
+          <summary class="muted small">Or type a path manually</summary>
+          <label class="field">
+            <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
+            <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
+          </label>
+          <div class="btnrow">
+            <button id="saveMirror" class="btn btn-ghost">Save typed path</button>
+          </div>
+        </details>
       </div>
 
       <!-- Server control -->

@@ -93,6 +93,7 @@ function render(s) {
 
   $('phoneUrl').textContent = s.phoneUrl;
   setInput($('storageInput'), s.storagePath);
+  $('storagePathDisplay').textContent = s.storagePath || '—';
   $('photoCount').textContent = s.fileCount.toLocaleString();
   $('serverState').textContent = s.running ? 'Running' : 'Stopped';
   $('toggleServer').textContent = s.running ? 'Stop server' : 'Start server';
@@ -155,6 +156,8 @@ function renderMirror(s) {
   const m = s.mirror || { enabled: false };
   setInput($('mirrorInput'), m.enabled ? m.path : '');
   $('mirrorSync').disabled = !m.enabled;
+  // "Copy now" / "Turn off" only make sense once a second copy is set.
+  $('mirrorOff').classList.toggle('hidden', !m.enabled);
   if (m.enabled) {
     let t = m.connected ? 'On — every photo is copied here too' : '⚠ Drive not connected';
     if (m.lastAt) t += ` · last copied ${fmtAgo(m.lastAt)}`;
@@ -219,6 +222,21 @@ $('toggleServer').onclick = action(async () => {
   refreshActivity();
 });
 
+// Primary path: native folder picker. The manual text field below is optional.
+$('chooseFolder').onclick = async () => {
+  $('storageHint').textContent = 'Opening folder picker…';
+  try {
+    const res = await api('/api/pick-folder', 'POST');
+    if (res.cancelled) { $('storageHint').textContent = ''; return; }
+    render(res);
+    $('storageHint').textContent = 'Saved ✓';
+  } catch (e) {
+    $('storageHint').textContent = e.message || 'Could not set folder';
+  }
+  setTimeout(() => { $('storageHint').textContent = ''; }, 4000);
+  refreshActivity();
+};
+
 $('saveStorage').onclick = async () => {
   const path = $('storageInput').value.trim();
   if (!path) { $('storageHint').textContent = 'Enter a folder path'; return; }
@@ -255,6 +273,32 @@ $('copyUrl').onclick = () => {
 };
 
 // ---- second copy (mirror) --------------------------------------------------
+// Primary path: native folder picker (sets the folder + catches up in the
+// background). The manual text field below is optional.
+$('chooseMirror').onclick = async () => {
+  $('mirrorHint').textContent = 'Opening folder picker…';
+  try {
+    const res = await api('/api/mirror/pick', 'POST');
+    render(res);
+    $('mirrorHint').textContent = res.cancelled ? '' : 'Saved ✓ — copying in the background';
+  } catch (e) {
+    $('mirrorHint').textContent = e.message || 'Could not set folder';
+  }
+  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
+  refreshActivity();
+};
+$('mirrorOff').onclick = async () => {
+  $('mirrorHint').textContent = 'Turning off…';
+  try {
+    render(await api('/api/mirror/clear', 'POST'));
+    $('mirrorHint').textContent = 'Turned off';
+  } catch (e) {
+    $('mirrorHint').textContent = e.message || 'Could not turn off';
+  }
+  setTimeout(() => { $('mirrorHint').textContent = ''; }, 4000);
+  refreshActivity();
+};
+
 $('saveMirror').onclick = async () => {
   const path = $('mirrorInput').value.trim(); // blank = turn off
   $('mirrorHint').textContent = 'Saving…';
