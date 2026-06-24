@@ -1,7 +1,12 @@
 package com.photosync.app
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.button.MaterialButton
 
 /**
  * "How it works" + FAQ — a plain-language explanation of what PhotoSync does
@@ -15,6 +20,15 @@ class HelpActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_help)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
+        findViewById<MaterialButton>(R.id.supportButton).setOnClickListener {
+            val url = getString(R.string.support_url)
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, url, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {

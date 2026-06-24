@@ -109,7 +109,13 @@
     <string name="help_a_missing">Check that you\'re on your home Wi‑Fi and the computer is on. Backups run periodically and resume on their own — pull down on the gallery to refresh, or use \"Sync now\".</string>
 
     <string name="help_q_free">Is it really free?</string>
-    <string name="help_a_free">Yes. PhotoSync is free and open source, and because the storage is your own computer there\'s no subscription and no limit beyond your own drive.</string>
+    <string name="help_a_free">Yes. PhotoSync is free and open source, and because the storage is your own computer there\'s no subscription and no limit beyond your own drive. It\'s built by one person on evenings and weekends — if it\'s useful to you, a small tip helps keep it going (entirely optional).</string>
+
+    <!-- Support / donations -->
+    <string name="support_title">Support development</string>
+    <string name="support_body">I\'m a father, engineer, and product builder. I started PhotoSync because photo storage has become expensive and subscription-heavy — yet external drives are cheap and most people already own a computer at home. I wanted a simpler alternative that gives people control over their own photos.\n\nIt\'s developed in my evenings and weekends. If you find it valuable, you can buy me a coffee — every contribution helps me spend more time building and improving the app.</string>
+    <string name="support_button">☕  Buy me a coffee</string>
+    <string name="support_url" translatable="false">https://ko-fi.com/danielgamiz</string>
 
     <plurals name="folder_item_count">
         <item quantity="one">%d item</item>
