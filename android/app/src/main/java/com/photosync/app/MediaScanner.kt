@@ -57,8 +57,9 @@ object MediaScanner {
      * (default), the whole gallery, or hand-picked folders.
      */
     fun itemsForBackup(context: Context, prefs: SyncPrefs): List<MediaItem> {
-        val all = allItems(context, prefs.includeVideos)
-        return when (prefs.backupMode) {
+        // Videos-only backup still needs videos fetched even if "Include videos" is off.
+        val all = allItems(context, prefs.includeVideos || prefs.videosOnly)
+        val fromSource = when (prefs.backupMode) {
             SyncPrefs.MODE_ALL -> all
             SyncPrefs.MODE_CUSTOM -> {
                 val selected = prefs.selectedFolderIds
@@ -66,6 +67,7 @@ object MediaScanner {
             }
             else -> all.filter { it.isCameraRoll } // MODE_CAMERA
         }
+        return if (prefs.videosOnly) fromSource.filter { it.isVideo } else fromSource
     }
 
     /** All device folders, camera roll first, then alphabetical. */

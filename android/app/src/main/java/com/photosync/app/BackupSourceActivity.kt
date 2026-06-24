@@ -73,7 +73,7 @@ class BackupSourceActivity : AppCompatActivity() {
     private fun loadFolders() {
         lifecycleScope.launch {
             val folders = withContext(Dispatchers.IO) {
-                MediaScanner.listFolders(this@BackupSourceActivity, prefs.includeVideos)
+                MediaScanner.listFolders(this@BackupSourceActivity, prefs.includeVideos || prefs.videosOnly)
             }
             foldersEmpty.visibility = if (folders.isEmpty()) View.VISIBLE else View.GONE
             folderAdapter.submit(folders)

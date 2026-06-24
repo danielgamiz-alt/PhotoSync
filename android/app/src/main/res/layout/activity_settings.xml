@@ -154,6 +154,13 @@
             android:layout_marginTop="12dp"
             android:text="@string/include_videos_label" />
 
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/videosOnlySwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/videos_only_label" />
+
         <Button
             android:id="@+id/syncNowButton"
             android:layout_width="match_parent"

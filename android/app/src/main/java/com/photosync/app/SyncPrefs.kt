@@ -38,6 +38,11 @@ class SyncPrefs(context: Context) {
         get() = prefs.getBoolean("includeVideos", true)
         set(value) = prefs.edit().putBoolean("includeVideos", value).apply()
 
+    /** Back up only videos, skipping photos. Overrides [includeVideos]. */
+    var videosOnly: Boolean
+        get() = prefs.getBoolean("videosOnly", false)
+        set(value) = prefs.edit().putBoolean("videosOnly", value).apply()
+
     /** What to back up: [MODE_CAMERA] (default), [MODE_ALL], or [MODE_CUSTOM]. */
     var backupMode: String
         get() = prefs.getString("backupMode", MODE_CAMERA) ?: MODE_CAMERA

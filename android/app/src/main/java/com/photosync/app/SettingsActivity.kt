@@ -31,6 +31,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var syncStatus: TextView
     private lateinit var autoSyncSwitch: SwitchCompat
     private lateinit var videosSwitch: SwitchCompat
+    private lateinit var videosOnlySwitch: SwitchCompat
     private lateinit var backupSourceSummary: TextView
 
     private val statusRefresher = Handler(Looper.getMainLooper())
@@ -54,6 +55,7 @@ class SettingsActivity : AppCompatActivity() {
         syncStatus = findViewById(R.id.syncStatus)
         autoSyncSwitch = findViewById(R.id.autoSyncSwitch)
         videosSwitch = findViewById(R.id.videosSwitch)
+        videosOnlySwitch = findViewById(R.id.videosOnlySwitch)
         backupSourceSummary = findViewById(R.id.backupSourceSummary)
 
         findViewById<Button>(R.id.backupSourceButton).setOnClickListener {
@@ -65,6 +67,8 @@ class SettingsActivity : AppCompatActivity() {
         apiKeyInput.setText(prefs.apiKey)
         autoSyncSwitch.isChecked = prefs.autoSyncEnabled
         videosSwitch.isChecked = prefs.includeVideos
+        videosOnlySwitch.isChecked = prefs.videosOnly
+        updateVideoSwitchState()
 
         findViewById<Button>(R.id.discoverButton).setOnClickListener { discoverServers() }
         findViewById<Button>(R.id.testButton).setOnClickListener { testConnection() }
@@ -82,6 +86,16 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         videosSwitch.setOnCheckedChangeListener { _, checked -> prefs.includeVideos = checked }
+
+        videosOnlySwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.videosOnly = checked
+            updateVideoSwitchState()
+        }
+    }
+
+    /** "Include videos" is moot while backing up videos only, so lock it on. */
+    private fun updateVideoSwitchState() {
+        videosSwitch.isEnabled = !prefs.videosOnly
     }
 
     override fun onSupportNavigateUp(): Boolean {

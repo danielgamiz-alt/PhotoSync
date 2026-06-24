@@ -21,6 +21,7 @@
     <string name="section_sync">Sync</string>
     <string name="auto_sync_label">Auto-upload when on WiFi</string>
     <string name="include_videos_label">Include videos</string>
+    <string name="videos_only_label">Back up videos only</string>
     <string name="sync_now">Sync now</string>
     <string name="sync_queued">Sync started (runs when WiFi is available)</string>
     <string name="auto_sync_on">Auto-sync enabled — runs every 15 min on WiFi</string>
