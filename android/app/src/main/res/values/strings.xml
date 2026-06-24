@@ -3,6 +3,7 @@
     <string name="app_name">PhotoSync</string>
 
     <string name="section_server">Server</string>
+    <string name="server_wifi_hint">PhotoSync only works on your home Wi‑Fi — the same network your computer is on. Tap \"Find server\" while at home.</string>
     <string name="server_url_hint">Server URL (e.g. http://192.168.1.50:8420)</string>
     <string name="api_key_hint">API key (leave empty if not set)</string>
     <string name="find_server">Find server</string>
@@ -32,6 +33,7 @@
     <string name="permission_needed">PhotoSync needs photo access to back up your pictures</string>
 
     <string name="menu_settings">Settings</string>
+    <string name="menu_help">How it works</string>
     <string name="backed_up_summary">%1$d of %2$d backed up</string>
     <string name="gallery_empty">No photos found on this device</string>
     <string name="configure_server_first">Set up your server in Settings first</string>
@@ -69,6 +71,30 @@
     <string name="folder_camera_label">%1$s · Camera roll</string>
     <string name="backup_camera_summary">Camera Roll</string>
     <string name="backup_all_summary">Entire gallery</string>
+
+    <!-- How it works / FAQ -->
+    <string name="help_link">How it works &amp; FAQ</string>
+    <string name="help_title">How PhotoSync works</string>
+    <string name="help_intro">PhotoSync backs up your phone\'s photos and videos straight to your family\'s own computer at home — not to a company\'s cloud. That\'s what keeps it private and free.\n\nBecause the photos go to that computer, your phone can only back them up when both are on the same home Wi‑Fi and the computer is turned on.</string>
+    <string name="help_faq_title">Common questions</string>
+
+    <string name="help_q_wifi">Why does it only work on my home Wi‑Fi?</string>
+    <string name="help_a_wifi">Your photos are saved on your own computer at home, not on the internet. Your phone can only reach that computer when it\'s on the same Wi‑Fi network. On mobile data or a different Wi‑Fi — work, a café, a friend\'s house — there\'s no way to reach it, so backups simply pause and pick up again automatically once you\'re home.</string>
+
+    <string name="help_q_server">Why do I need to add a server?</string>
+    <string name="help_a_server">Unlike Google Photos, no company is storing your pictures. The \"server\" is just the free PhotoSync program running on your household\'s computer or Raspberry Pi — that\'s where your photos are kept. The app needs its address so it knows where to send them. Tap \"Find server\" in Settings while at home and it\'s usually detected automatically.</string>
+
+    <string name="help_q_internet">Are my photos uploaded to the internet?</string>
+    <string name="help_a_internet">No. They go only to your own computer on your home network and stay on its drive. Nothing is sent to the cloud or to us.</string>
+
+    <string name="help_q_background">Do I need to keep the app open?</string>
+    <string name="help_a_background">No. Once set up, PhotoSync backs up automatically in the background about every 15 minutes while you\'re on home Wi‑Fi. You can also tap \"Sync now\" anytime from the menu.</string>
+
+    <string name="help_q_missing">Why haven\'t my latest photos backed up yet?</string>
+    <string name="help_a_missing">Check that you\'re on your home Wi‑Fi and the computer is on. Backups run periodically and resume on their own — pull down on the gallery to refresh, or use \"Sync now\".</string>
+
+    <string name="help_q_free">Is it really free?</string>
+    <string name="help_a_free">Yes. PhotoSync is free and open source, and because the storage is your own computer there\'s no subscription and no limit beyond your own drive.</string>
 
     <plurals name="folder_item_count">
         <item quantity="one">%d item</item>

@@ -60,6 +60,10 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, BackupSourceActivity::class.java))
         }
 
+        findViewById<TextView>(R.id.helpLink).setOnClickListener {
+            startActivity(Intent(this, HelpActivity::class.java))
+        }
+
         usernameInput.setText(prefs.username)
         serverUrlInput.setText(prefs.serverUrl)
         apiKeyInput.setText(prefs.apiKey)
