@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PhotoServer</title>
+  <title>PhotoSync Server</title>
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="stylesheet" href="/tokens.css" />
@@ -13,7 +13,7 @@
 <body>
   <header>
     <div class="brand">
-      <svg class="logo" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhotoServer icon">
+      <svg class="logo" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhotoSync Server icon">
         <rect width="108" height="108" rx="24" fill="#15161a"/>
         <path fill="var(--ap-red)" d="M48,43.608 L38,26.288 A32,32 0 0 1 70,26.288 L60,43.608 Z"/>
         <path fill="var(--ap-orange)" d="M60,43.608 L70,26.288 A32,32 0 0 1 86,54 L66,54 Z"/>
@@ -24,7 +24,7 @@
         <path fill="none" stroke="#15161a" stroke-width="1.6" d="M60,43.608 L70,26.288 M66,54 L86,54 M60,64.392 L70,81.712 M48,64.392 L38,81.712 M42,54 L22,54 M48,43.608 L38,26.288"/>
       </svg>
       <div class="brand-text">
-        <h1>PhotoServer</h1>
+        <h1>PhotoSync Server</h1>
         <span class="brand-privacy">🔒 Stored only on this PC — nothing leaves your home</span>
       </div>
     </div>
@@ -37,7 +37,7 @@
   </header>
 
   <!-- Always-visible reassurance line -->
-  <div id="statusStrip" class="status-strip">Connecting to the PhotoServer app…</div>
+  <div id="statusStrip" class="status-strip">Connecting to PhotoSync Server…</div>
 
   <!-- Selection action bar (shown when items are selected) -->
   <div id="selectionBar" class="selbar hidden">
@@ -50,7 +50,7 @@
 
   <main>
     <div id="offlineBanner" class="warning hidden">
-      ⚠ <b>Not connected to the PhotoServer app.</b>
+      ⚠ <b>Not connected to PhotoSync Server.</b>
       This page can't reach the app — it may not be running.
       Start it from the system-tray icon, or launch it again
       (<code>npm start</code> in the <code>desktop</code> folder).
@@ -97,17 +97,25 @@
       <div class="card">
         <h2>Backup location</h2>
         <div id="driveWarning" class="warning hidden">⚠ The backup drive isn't connected. Photos can't be saved until it's plugged in.</div>
-        <label class="field">
-          <span>Folder where your photos are saved</span>
-          <input id="storageInput" type="text" spellcheck="false" />
-        </label>
+        <p class="muted small">Where your photos are saved on this PC:</p>
+        <div class="pathrow"><code id="storagePathDisplay">—</code></div>
         <div class="diskbar"><div id="diskUsed" class="diskbar-fill"></div></div>
         <p id="diskText" class="muted small">—</p>
         <div class="btnrow">
-          <button id="saveStorage" class="btn">Save backup folder</button>
+          <button id="chooseFolder" class="btn">Choose folder…</button>
           <span id="storageHint" class="muted small"></span>
         </div>
-        <p class="muted small">Tip: paste a path like <code>E:\PhotoBackup</code>. It's created if it doesn't exist.</p>
+        <details>
+          <summary class="muted small">Or type a path manually</summary>
+          <label class="field">
+            <span>Folder path</span>
+            <input id="storageInput" type="text" spellcheck="false" placeholder="e.g. E:\PhotoBackup" />
+          </label>
+          <div class="btnrow">
+            <button id="saveStorage" class="btn btn-ghost">Save typed path</button>
+          </div>
+          <p class="muted small">A path like <code>E:\PhotoBackup</code> is created if it doesn't exist.</p>
+        </details>
       </div>
 
       <!-- Second copy (mirror) -->
@@ -115,16 +123,23 @@
         <h2>Second copy</h2>
         <p class="muted small">Also copy every backed-up photo to another folder or drive, so your backup itself is backed up.</p>
         <p class="note-tip">💡 Use an <b>external hard drive</b> (or another device) — not a folder on this same PC. A second copy only protects you if it's on separate hardware: if this computer is lost, stolen, or breaks, your photos are still safe on the external drive.</p>
-        <label class="field">
-          <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
-          <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
-        </label>
         <p id="mirrorStatusText" class="muted small"></p>
         <div class="btnrow">
-          <button id="saveMirror" class="btn">Save second copy</button>
+          <button id="chooseMirror" class="btn">Choose folder…</button>
           <button id="mirrorSync" class="btn btn-ghost">Copy now</button>
+          <button id="mirrorOff" class="btn btn-ghost hidden">Turn off</button>
           <span id="mirrorHint" class="muted small"></span>
         </div>
+        <details>
+          <summary class="muted small">Or type a path manually</summary>
+          <label class="field">
+            <span>Second folder <span class="muted small">(leave blank to turn off)</span></span>
+            <input id="mirrorInput" type="text" spellcheck="false" placeholder="e.g. F:\PhotoBackup" />
+          </label>
+          <div class="btnrow">
+            <button id="saveMirror" class="btn btn-ghost">Save typed path</button>
+          </div>
+        </details>
       </div>
 
       <!-- Server control -->
@@ -169,7 +184,7 @@
       </div>
 
       <div class="footer">
-        <button id="quit" class="btn btn-danger">Quit PhotoServer</button>
+        <button id="quit" class="btn btn-danger">Quit PhotoSync Server</button>
         <p class="muted small">Quitting stops backups until you start the app again.</p>
       </div>
     </section>

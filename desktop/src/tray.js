@@ -23,11 +23,11 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
   // Menu order is fixed so we can dispatch clicks by seq_id.
   const TOGGLE = 1;
   const buildItems = (isRunning) => [
-    { title: 'Open dashboard', tooltip: 'Open the PhotoServer dashboard', enabled: true },
+    { title: 'Open dashboard', tooltip: 'Open the PhotoSync Server dashboard', enabled: true },
     { title: isRunning ? 'Stop server' : 'Start server', tooltip: 'Start/stop backups', enabled: true },
     { title: 'Open backup folder', tooltip: 'Show where photos are saved', enabled: true },
     SysTray.separator,
-    { title: 'Quit PhotoServer', tooltip: 'Stop and exit', enabled: true },
+    { title: 'Quit PhotoSync Server', tooltip: 'Stop and exit', enabled: true },
   ];
 
   const systray = new SysTray({
@@ -35,7 +35,7 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
       icon: running ? icons.running : icons.stopped,
       isTemplateIcon: false,
       title: '',
-      tooltip: tooltip || 'PhotoServer',
+      tooltip: tooltip || 'PhotoSync Server',
       items: buildItems(running),
     },
     debug: false,
@@ -74,7 +74,7 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
             icon: isRunning ? icons.running : icons.stopped,
             isTemplateIcon: false,
             title: '',
-            tooltip: tip || 'PhotoServer',
+            tooltip: tip || 'PhotoSync Server',
             items: buildItems(isRunning),
           },
         });

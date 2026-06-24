@@ -142,7 +142,7 @@ async function main() {
 
     // static dashboard
     const html = await fetch(`${BASE}/`).then((x) => x.text());
-    check('static: serves dashboard html', html.includes('PhotoServer') && html.includes('Connect your phone'));
+    check('static: serves dashboard html', html.includes('PhotoSync Server') && html.includes('Connect your phone'));
 
     // path traversal blocked
     const trav = await fetch(`${BASE}/../../server/config.json`);

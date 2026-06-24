@@ -11,7 +11,7 @@
     <string name="not_connected">Not connected yet</string>
     <string name="searching">Searching for servers on this WiFi…</string>
     <string name="no_servers_found">No server found.</string>
-    <string name="no_servers_help">Try this:\n\n(a) Make sure the PhotoServer app is running on your PC.\n(b) Check that both devices are on the same WiFi network.\n(c) Or type the address shown in the PC app\'s Settings into the field above.</string>
+    <string name="no_servers_help">Try this:\n\n(a) Make sure the PhotoSync Server app is running on your PC.\n(b) Check that both devices are on the same WiFi network.\n(c) Or type the address shown in the PC app\'s Settings into the field above.</string>
     <string name="try_again">Try again</string>
     <string name="pick_server">Pick a server</string>
     <string name="found_server">Found \"%1$s\" at %2$s</string>

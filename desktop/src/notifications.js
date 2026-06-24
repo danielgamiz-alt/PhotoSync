@@ -26,7 +26,7 @@ class Notifier {
     if (!this.enabled || !this._notifier) return;
     try {
       this._notifier.notify({
-        appName: 'PhotoServer',
+        appName: 'PhotoSync Server',
         title,
         message,
         icon: path.join(__dirname, '..', 'assets', 'app.png'),

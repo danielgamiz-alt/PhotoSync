@@ -94,8 +94,8 @@ async function main() {
     if (!tray) return;
     const s = photoServer.stats();
     let tip = s.running
-      ? `PhotoServer — running · ${s.fileCount} photos`
-      : 'PhotoServer — stopped';
+      ? `PhotoSync Server — running · ${s.fileCount} photos`
+      : 'PhotoSync Server — stopped';
     if (tip.length > 120) tip = tip.slice(0, 117) + '…';
     tray.update({ running: s.running, tooltip: tip });
   }
@@ -115,7 +115,7 @@ async function main() {
         ? `Port ${config.port} is already in use — change it in Settings.`
         : `Could not start server: ${e.message}`;
       activityLog.add('error', msg);
-      notifier.notify('PhotoServer', msg);
+      notifier.notify('PhotoSync Server', msg);
     }
     syncTray();
   }
@@ -125,7 +125,7 @@ async function main() {
       await photoServer.restart();
     } catch (e) {
       activityLog.add('error', `Could not restart server: ${e.message}`);
-      notifier.notify('PhotoServer', `Could not start: ${e.message}`);
+      notifier.notify('PhotoSync Server', `Could not start: ${e.message}`);
     }
     syncTray();
   }
@@ -224,7 +224,7 @@ async function main() {
     if (target && fs.existsSync(target)) {
       exec(`explorer "${target}"`);
     } else {
-      notifier.notify('PhotoServer', 'Backup drive is not connected.');
+      notifier.notify('PhotoSync Server', 'Backup drive is not connected.');
     }
   }
 
@@ -429,7 +429,7 @@ async function main() {
   } catch (e) {
     if (e.code === 'EADDRINUSE') {
       // Another instance already owns the dashboard port — just surface it.
-      console.log('PhotoServer is already running; opening its dashboard.');
+      console.log('PhotoSync Server is already running; opening its dashboard.');
       openDashboard();
       process.exit(0);
     }
@@ -444,7 +444,7 @@ async function main() {
     runningIcoPath: path.join(ASSETS, 'running.ico'),
     stoppedIcoPath: path.join(ASSETS, 'stopped.ico'),
     running: photoServer.running,
-    tooltip: 'PhotoServer',
+    tooltip: 'PhotoSync Server',
     handlers: {
       onOpenDashboard: openDashboard,
       onToggleServer: () => deps.setServerRunning(!photoServer.running),
@@ -463,7 +463,7 @@ async function main() {
   process.on('SIGINT', quit);
   process.on('SIGTERM', quit);
 
-  console.log(`PhotoServer desktop running. Dashboard: ${CONTROL_URL}`);
+  console.log(`PhotoSync Server desktop running. Dashboard: ${CONTROL_URL}`);
 }
 
 main().catch((err) => {

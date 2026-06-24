@@ -155,7 +155,7 @@ async function route(req, res, deps) {
   if (p === '/api/settings' && req.method === 'POST') {
     const body = await readJson(req);
     const patch = {};
-    if (typeof body.serverName === 'string') patch.serverName = body.serverName.trim() || 'PhotoServer';
+    if (typeof body.serverName === 'string') patch.serverName = body.serverName.trim() || 'PhotoSync Server';
     if (typeof body.apiKey === 'string') patch.apiKey = body.apiKey;
     if (body.port !== undefined) {
       const port = parseInt(body.port, 10);

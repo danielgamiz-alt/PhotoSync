@@ -88,7 +88,7 @@ class PhotoServer extends EventEmitter {
     const info = this.stats();
     this.emit('log', {
       level: 'info',
-      message: `PhotoServer v${VERSION} "${this.config.serverName}" listening on port ${this.config.port}`,
+      message: `PhotoSync Server v${VERSION} "${this.config.serverName}" listening on port ${this.config.port}`,
     });
     this.emit('started', info);
     return info;
@@ -112,7 +112,7 @@ class PhotoServer extends EventEmitter {
 
     this._running = false;
     this.emit('stopped');
-    this.emit('log', { level: 'info', message: 'PhotoServer stopped' });
+    this.emit('log', { level: 'info', message: 'PhotoSync Server stopped' });
   }
 
   /** Apply config changes (e.g. new storage folder) and rebind. */
