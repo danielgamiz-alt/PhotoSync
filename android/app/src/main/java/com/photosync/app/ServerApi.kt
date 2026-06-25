@@ -12,6 +12,9 @@ data class ServerHealth(
     val name: String,
     val requiresApiKey: Boolean,
     val fileCount: Long,
+    /** The PC app's version (e.g. "0.2.0"); "" on older servers. Reserved for a
+     *  future "update PhotoSync Server on your computer" nudge. */
+    val version: String = "",
 )
 
 data class UploadResult(val stored: Boolean, val path: String)
@@ -41,6 +44,7 @@ class ServerApi(
                 name = json.optString("name"),
                 requiresApiKey = json.optBoolean("requiresApiKey"),
                 fileCount = json.optLong("fileCount"),
+                version = json.optString("version"),
             )
         } catch (e: Exception) {
             null

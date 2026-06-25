@@ -75,6 +75,17 @@
     <string name="invite_card_body">PhotoSync is backing them up to your own computer — no cloud, no subscription. Know someone tired of paying for photo storage?</string>
     <string name="invite_card_share">Invite a friend</string>
     <string name="invite_card_dismiss">Maybe later</string>
+
+    <!-- In-app update banner + notification -->
+    <string name="update_banner_title">Update available</string>
+    <string name="update_banner_version">PhotoSync %1$s is ready to install</string>
+    <string name="update_whats_new">What\'s new</string>
+    <string name="update_action">Update</string>
+    <string name="update_dismiss">Later</string>
+    <string name="update_notif_channel">App updates</string>
+    <string name="update_notif_channel_desc">Tells you when a newer version of PhotoSync is available.</string>
+    <string name="update_notif_title">Update PhotoSync</string>
+    <string name="update_notif_text">Version %1$s is available — tap to update.</string>
     <string name="server_unreachable_summary">Can\'t reach your server — check it\'s on and the address is right in Settings</string>
     <string name="configure_server_first">Set up your server in Settings first</string>
     <string name="status_done">Backed up</string>

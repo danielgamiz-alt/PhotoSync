@@ -2,8 +2,11 @@ package com.photosync.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -32,6 +35,10 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val prefs = SyncPrefs(applicationContext)
+
+        // Piggyback a (throttled) update check on every pass so a new release is
+        // surfaced in the background, not just when the app is opened.
+        checkForUpdates(prefs)
 
         if (prefs.serverUrl.isEmpty()) {
             prefs.lastSyncStatus = "No server configured"
@@ -89,6 +96,58 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Backup progress", NotificationManager.IMPORTANCE_LOW)
                 .apply { description = "Shows while photos are being backed up." }
+        )
+    }
+
+    /**
+     * Refreshes the cached latest.json (at most every few hours) and fires a
+     * one-time notification when a newer app build is available. De-spammed via
+     * [SyncPrefs.notifiedUpdateVersionCode] so a release notifies once, not on
+     * every sync pass.
+     */
+    private fun checkForUpdates(prefs: SyncPrefs) {
+        val sixHours = 6 * 60 * 60 * 1000L
+        val stale = prefs.cachedLatest.isEmpty() ||
+            System.currentTimeMillis() - prefs.lastUpdateCheckAt >= sixHours
+        if (stale) {
+            val body = UpdateChecker.fetch() ?: return
+            prefs.cachedLatest = body
+            prefs.lastUpdateCheckAt = System.currentTimeMillis()
+        }
+        val update = UpdateChecker.appUpdateFrom(prefs.cachedLatest, BuildConfig.VERSION_CODE) ?: return
+        if (prefs.notifiedUpdateVersionCode >= update.versionCode) return
+        notifyUpdate(update)
+        prefs.notifiedUpdateVersionCode = update.versionCode
+    }
+
+    private fun notifyUpdate(update: UpdateChecker.AppUpdate) {
+        ensureUpdateChannel()
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(update.url))
+        val pending = PendingIntent.getActivity(
+            applicationContext, 0, view,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notification = NotificationCompat.Builder(applicationContext, UPDATE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_status_uploading)
+            .setContentTitle(applicationContext.getString(R.string.update_notif_title))
+            .setContentText(applicationContext.getString(R.string.update_notif_text, update.versionName))
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+        applicationContext.getSystemService(NotificationManager::class.java)
+            .notify(UPDATE_NOTIF_ID, notification)
+    }
+
+    private fun ensureUpdateChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val nm = applicationContext.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(UPDATE_CHANNEL_ID) != null) return
+        nm.createNotificationChannel(
+            NotificationChannel(
+                UPDATE_CHANNEL_ID,
+                applicationContext.getString(R.string.update_notif_channel),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = applicationContext.getString(R.string.update_notif_channel_desc) }
         )
     }
 
@@ -198,6 +257,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         private const val ONETIME_WORK = "photosync-now"
         private const val CHANNEL_ID = "backup-progress"
         private const val NOTIF_ID = 42
+        private const val UPDATE_CHANNEL_ID = "app-updates"
+        private const val UPDATE_NOTIF_ID = 43
 
         private fun wifiConstraints() = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.UNMETERED)

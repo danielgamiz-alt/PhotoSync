@@ -38,6 +38,12 @@ android {
         }
     }
 
+    // VERSION_NAME / VERSION_CODE in BuildConfig drive the in-app update check
+    // (UpdateChecker compares them against latest.json).
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
