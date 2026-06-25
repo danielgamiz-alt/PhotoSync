@@ -98,6 +98,12 @@ async function route(req, res, deps) {
     return serveFile(req, res, entry.abs, mimeFor(entry.path));
   }
 
+  if (p === '/api/media/reveal' && req.method === 'POST') {
+    const body = await readJson(req);
+    if (typeof body.hash !== 'string' || body.hash === '') throw httpError(400, 'hash required');
+    return sendJson(res, 200, deps.revealMedia(body.hash));
+  }
+
   if (p === '/api/media/delete' && req.method === 'POST') {
     const body = await readJson(req);
     if (!Array.isArray(body.hashes) || body.hashes.length === 0) {

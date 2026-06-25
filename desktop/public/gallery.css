@@ -127,6 +127,7 @@
 }
 .lb-close { top: 16px; right: 16px; width: 42px; height: 42px; font-size: 20px; }
 .lb-delete { top: 16px; right: 70px; height: 42px; padding: 0 16px; font-weight: 600; background: rgba(217,48,37,.85); }
+.lb-folder { top: 16px; right: 168px; height: 42px; padding: 0 16px; font-weight: 600; }
 .lb-prev, .lb-next { top: 50%; transform: translateY(-50%); width: 48px; height: 64px; font-size: 30px; }
 .lb-prev { left: 16px; }
 .lb-next { right: 16px; }

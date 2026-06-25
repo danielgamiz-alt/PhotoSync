@@ -207,6 +207,13 @@ class MainActivity : AppCompatActivity() {
         if (hasMediaPermission()) refresh()
         renderUpdateBanner()
         maybeRefreshUpdate()
+        // Opening the app should try to sync right away (and make sure the
+        // background WiFi schedule is in place) rather than waiting for the next
+        // periodic run — so a just-reachable server uploads immediately.
+        SyncWorker.ensureScheduled(this)
+        if (prefs.serverUrl.isNotEmpty() && prefs.username.isNotEmpty()) {
+            SyncWorker.syncOnOpen(this)
+        }
     }
 
     /**

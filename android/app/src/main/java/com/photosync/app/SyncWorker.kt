@@ -274,8 +274,35 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             )
         }
 
+        /**
+         * Make sure the periodic WiFi sync is registered whenever auto-sync is
+         * on. Safe to call on every app start / open (KEEP keeps any existing
+         * schedule). This is what lets the phone reconnect and upload on its own
+         * — once WiFi/the server come back, WorkManager runs the pending pass as
+         * soon as the UNMETERED network constraint is met, without the user
+         * having to open the app.
+         */
+        fun ensureScheduled(context: Context) {
+            if (SyncPrefs(context).autoSyncEnabled) schedulePeriodic(context)
+            else cancelPeriodic(context)
+        }
+
         fun cancelPeriodic(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK)
+        }
+
+        /**
+         * Kick off a sync as soon as the app is opened, without disrupting a pass
+         * that's already running (KEEP). Gives the user an immediate "try to
+         * upload now" instead of waiting up to 15 min for the next periodic run.
+         */
+        fun syncOnOpen(context: Context) {
+            val request = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(wifiConstraints())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                ONETIME_WORK, ExistingWorkPolicy.KEEP, request
+            )
         }
 
         /** "Sync now" action and backlog chaining. */

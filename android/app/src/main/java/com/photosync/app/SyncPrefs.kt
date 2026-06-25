@@ -30,8 +30,10 @@ class SyncPrefs(context: Context) {
         get() = prefs.getString("username", "") ?: ""
         set(value) = prefs.edit().putString("username", value.trim()).apply()
 
+    /** Auto-upload over WiFi. On by default so backups "just work" once the
+     *  server and name are set, without the user hunting for a toggle. */
     var autoSyncEnabled: Boolean
-        get() = prefs.getBoolean("autoSyncEnabled", false)
+        get() = prefs.getBoolean("autoSyncEnabled", true)
         set(value) = prefs.edit().putBoolean("autoSyncEnabled", value).apply()
 
     var includeVideos: Boolean

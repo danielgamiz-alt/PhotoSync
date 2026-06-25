@@ -312,6 +312,23 @@ async function main() {
     }
   }
 
+  // Reveal one stored photo in Explorer (folder opens with the file selected),
+  // so the user can drag it into an email / share it. Falls back to opening the
+  // containing folder if the exact file can't be located.
+  function revealMedia(hash) {
+    const entry = hash && storage.get(hash);
+    if (!entry) return { ok: false, error: 'not found' };
+    const abs = path.join(storage.root, entry.path);
+    if (!fs.existsSync(abs)) {
+      openFolder();
+      return { ok: false, error: 'file missing' };
+    }
+    // /select, highlights the file inside its folder. (explorer.exe exits 1 even
+    // on success, so we don't treat a non-zero code as failure.)
+    exec(`explorer /select,"${abs}"`);
+    return { ok: true };
+  }
+
   async function quit() {
     activityLog.add('info', 'Shutting down');
     try {
@@ -476,6 +493,7 @@ async function main() {
       return getStatus();
     },
     openFolder,
+    revealMedia,
     onQuit: quit,
   };
 
@@ -503,7 +521,7 @@ async function main() {
     tooltip: 'PhotoSync Server',
     handlers: {
       onOpenDashboard: openDashboard,
-      onToggleServer: () => deps.setServerRunning(!photoServer.running),
+      onSetRunning: (run) => deps.setServerRunning(run),
       onOpenFolder: openFolder,
       onQuit: quit,
     },

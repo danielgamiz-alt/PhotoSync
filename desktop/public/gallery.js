@@ -158,21 +158,62 @@
       )
       .join('');
     applySelectionClasses();
+    setupLazyLoad();
   }
 
   function renderTile(i) {
     const m = media[i];
+    // Media carries `data-src` only — it isn't fetched until the tile nears the
+    // viewport (see setupLazyLoad). With a big library this is the difference
+    // between thousands of immediate requests and just the few around the
+    // scroll position.
     if (m.type === 'video') {
       return `<div class="tile video-tile" data-index="${i}" data-hash="${m.hash}">
-        <video preload="metadata" muted src="/media/file?hash=${m.hash}#t=0.1"></video>
+        <video muted data-src="/media/file?hash=${m.hash}#t=0.1"></video>
         <div class="play-badge">${PLAY_SVG}</div>
         <div class="tile-check">✓</div>
       </div>`;
     }
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
-      <img loading="lazy" src="/media/thumb?hash=${m.hash}" alt="">
+      <img data-src="/media/thumb?hash=${m.hash}" alt="">
       <div class="tile-check">✓</div>
     </div>`;
+  }
+
+  // ---- lazy thumbnail loading ----------------------------------------------
+  // Load each tile's image/video only as it approaches the viewport, and drop
+  // the source again once it's scrolled well out of view, so memory and network
+  // stay bounded no matter how large the library is. The generous rootMargin
+  // preloads a screenful or two ahead so scrolling feels instant.
+  let tileObserver = null;
+  function loadTileMedia(el) {
+    const src = el.dataset.src;
+    if (!src || el.getAttribute('src') === src) return;
+    if (el.tagName === 'VIDEO') el.preload = 'metadata';
+    el.setAttribute('src', src);
+  }
+  function unloadTileMedia(el) {
+    if (!el.hasAttribute('src')) return;
+    el.removeAttribute('src');
+    if (el.tagName === 'VIDEO') {
+      el.preload = 'none';
+      el.load(); // abort any in-flight metadata fetch and free the decoded frame
+    }
+  }
+  function setupLazyLoad() {
+    if (tileObserver) tileObserver.disconnect();
+    tileObserver = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const el = e.target.querySelector('img, video');
+          if (!el) continue;
+          if (e.isIntersecting) loadTileMedia(el);
+          else unloadTileMedia(el);
+        }
+      },
+      { rootMargin: '800px 0px' }
+    );
+    document.querySelectorAll('#gallery .tile').forEach((t) => tileObserver.observe(t));
   }
 
   // ---- selection -----------------------------------------------------------
@@ -287,6 +328,16 @@
   $('lbClose').onclick = closeLightbox;
   $('lbPrev').onclick = () => navLightbox(-1);
   $('lbNext').onclick = () => navLightbox(1);
+  $('lbFolder').onclick = async () => {
+    const m = media[lightboxIndex];
+    if (!m) return;
+    // Opens the containing folder in Explorer with this file selected, so the
+    // user can drag it into an email / share it.
+    await fetch('/api/media/reveal', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hash: m.hash }),
+    }).catch(() => {});
+  };
   $('lbDelete').onclick = async () => {
     const m = media[lightboxIndex];
     if (!m) return;
