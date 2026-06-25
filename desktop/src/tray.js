@@ -22,13 +22,26 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
 
   // Menu order is fixed so we can dispatch clicks by seq_id.
   const TOGGLE = 1;
-  const buildItems = (isRunning) => [
+
+  // IMPORTANT: build the item objects ONCE and reuse the SAME references on
+  // every update. systray2 stamps an internal `__id` onto each item during
+  // init() (addInternalId) and resolves clicks through that id — but it does
+  // NOT re-stamp on an `update-menu`. If we handed it fresh objects each time,
+  // post-update clicks would carry an undefined id, systray2 would throw while
+  // resolving them, and our handler would never fire. That's the "can stop but
+  // can't start the server again" bug. Mutating these in place keeps the ids
+  // (and therefore clicks) alive across toggles.
+  const items = [
     { title: 'Open dashboard', tooltip: 'Open the PhotoSync Server dashboard', enabled: true },
-    { title: isRunning ? 'Stop server' : 'Start server', tooltip: 'Start/stop backups', enabled: true },
+    { title: 'Stop server', tooltip: 'Start/stop backups', enabled: true },
     { title: 'Open backup folder', tooltip: 'Show where photos are saved', enabled: true },
     SysTray.separator,
     { title: 'Quit PhotoSync Server', tooltip: 'Stop and exit', enabled: true },
   ];
+  const applyRunning = (isRunning) => {
+    items[TOGGLE].title = isRunning ? 'Stop server' : 'Start server';
+  };
+  applyRunning(running);
 
   const systray = new SysTray({
     menu: {
@@ -36,7 +49,7 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
       isTemplateIcon: false,
       title: '',
       tooltip: tooltip || 'PhotoSync Server',
-      items: buildItems(running),
+      items,
     },
     debug: false,
     copyDir: true,
@@ -68,6 +81,7 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
   return {
     update({ running: isRunning, tooltip: tip }) {
       try {
+        applyRunning(isRunning); // mutate the shared items in place (keeps __id)
         systray.sendAction({
           type: 'update-menu',
           menu: {
@@ -75,7 +89,7 @@ async function createTray({ runningIcoPath, stoppedIcoPath, running, tooltip, ha
             isTemplateIcon: false,
             title: '',
             tooltip: tip || 'PhotoSync Server',
-            items: buildItems(isRunning),
+            items,
           },
         });
       } catch {
