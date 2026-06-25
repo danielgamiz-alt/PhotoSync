@@ -45,7 +45,22 @@ Copy-Item (Join-Path $desktop "package.json") (Join-Path $deskDst "package.json"
 
 # node_modules (sharp, systray2 + helper exe, node-notifier + helper)
 Write-Host "Copying node_modules (this is the big part)..." -ForegroundColor DarkGray
-Copy-Item (Join-Path $desktop "node_modules") (Join-Path $deskDst "node_modules") -Recurse
+$nodeModulesDst = Join-Path $deskDst "node_modules"
+Copy-Item (Join-Path $desktop "node_modules") $nodeModulesDst -Recurse
+
+# 5b. Drop platform binaries this Windows build can never use. systray2 and
+# node-notifier ship helper binaries for macOS and Linux alongside the Windows
+# ones; only the Windows ones run here. Pruned from the dist copy only — the
+# dev node_modules is left intact. (sharp is already Windows-only via npm.)
+$prune = @(
+    "systray2\traybin\tray_darwin_release",
+    "systray2\traybin\tray_linux_release",
+    "node-notifier\vendor\mac.noindex"
+)
+foreach ($rel in $prune) {
+    $p = Join-Path $nodeModulesDst $rel
+    if (Test-Path $p) { Remove-Item $p -Recurse -Force }
+}
 
 # 6. A short readme for the folder
 @"
