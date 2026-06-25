@@ -68,6 +68,13 @@
     <string name="setup_step_server">Find your server</string>
     <string name="setup_step_done">Done — your photos back up automatically</string>
     <string name="setup_not_backing_up">Not backing up yet</string>
+
+    <!-- One-time "your photos are safe → invite a friend" card, shown on the
+         main screen once everything is backed up. Dismissible (per device). -->
+    <string name="invite_card_title">Your photos are safe 🎉</string>
+    <string name="invite_card_body">PhotoSync is backing them up to your own computer — no cloud, no subscription. Know someone tired of paying for photo storage?</string>
+    <string name="invite_card_share">Invite a friend</string>
+    <string name="invite_card_dismiss">Maybe later</string>
     <string name="server_unreachable_summary">Can\'t reach your server — check it\'s on and the address is right in Settings</string>
     <string name="configure_server_first">Set up your server in Settings first</string>
     <string name="status_done">Backed up</string>

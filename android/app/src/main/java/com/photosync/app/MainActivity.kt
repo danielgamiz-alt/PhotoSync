@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var setupStep1: TextView
     private lateinit var setupStep2: TextView
     private lateinit var setupStep3: TextView
+    private lateinit var inviteCard: View
     private lateinit var previewController: VideoPreviewController
 
     /** All scanned items (the chosen backup source). */
@@ -126,6 +127,13 @@ class MainActivity : AppCompatActivity() {
         }
         setupButton.setOnClickListener(openSettings)
         setupCard.setOnClickListener(openSettings)
+
+        inviteCard = findViewById(R.id.inviteCard)
+        findViewById<View>(R.id.inviteShareButton).setOnClickListener {
+            dismissInviteCard()
+            shareApp()
+        }
+        findViewById<View>(R.id.inviteDismissButton).setOnClickListener { dismissInviteCard() }
 
         val previewPlayer: PlayerView = findViewById(R.id.previewPlayer)
         val previewChipContainer: View = findViewById(R.id.previewChipContainer)
@@ -290,6 +298,22 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(share, getString(R.string.invite_chooser)))
     }
 
+    /**
+     * Shows the one-time invite card the first time everything is backed up —
+     * the natural "your photos are safe, tell a friend" moment — unless the user
+     * has already dismissed or acted on it.
+     */
+    private fun maybeShowInviteCard() {
+        inviteCard.visibility =
+            if (prefs.inviteCardDismissed) View.GONE else View.VISIBLE
+    }
+
+    /** Permanently hides the invite card (dismissed or shared). */
+    private fun dismissInviteCard() {
+        prefs.inviteCardDismissed = true
+        inviteCard.visibility = View.GONE
+    }
+
     /** Hands the ordered media list to the viewer and opens it at [mediaIndex]. */
     private fun openViewer(mediaIndex: Int) {
         GalleryData.items = items
@@ -367,6 +391,8 @@ class MainActivity : AppCompatActivity() {
             rows.firstOrNull()?.sectionLabel?.let { flashDatePill(it) }
 
             val configured = prefs.username.isNotEmpty() && prefs.serverUrl.isNotEmpty()
+            // Default hidden; only the "everything backed up" branch below re-shows it.
+            inviteCard.visibility = View.GONE
             if (configured) {
                 val doneCount = entries.count { it.status == SyncStatus.DONE }
                 val total = entries.size
@@ -374,6 +400,8 @@ class MainActivity : AppCompatActivity() {
                     // Everything is safe — headline number, no progress bar.
                     summaryText.text = getString(R.string.backed_up_all, doneCount)
                     summaryProgress.visibility = View.GONE
+                    // The natural "tell a friend" moment (skip an empty library).
+                    if (total > 0) maybeShowInviteCard()
                 } else if (uploadingId == null && !serverReachable()) {
                     // Configured, but pictures aren't moving and the server can't
                     // be reached (mistyped URL, PC off, wrong WiFi). Say so —

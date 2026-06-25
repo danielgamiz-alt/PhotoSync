@@ -65,6 +65,12 @@ class SyncPrefs(context: Context) {
         get() = prefs.getLong("totalUploaded", 0L)
         set(value) = prefs.edit().putLong("totalUploaded", value).apply()
 
+    /** True once the user has dismissed (or acted on) the one-time "your photos
+     *  are safe — invite a friend" card, so it never nags again. */
+    var inviteCardDismissed: Boolean
+        get() = prefs.getBoolean("inviteCardDismissed", false)
+        set(value) = prefs.edit().putBoolean("inviteCardDismissed", value).apply()
+
     companion object {
         /** Back up only the device camera folder (DCIM). The default. */
         const val MODE_CAMERA = "camera"
