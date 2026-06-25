@@ -71,6 +71,30 @@ class SyncPrefs(context: Context) {
         get() = prefs.getBoolean("inviteCardDismissed", false)
         set(value) = prefs.edit().putBoolean("inviteCardDismissed", value).apply()
 
+    // --- In-app update check (see UpdateChecker) ---
+
+    /** Raw latest.json from the last successful fetch, so the update banner can
+     *  render instantly on open without waiting for the network. */
+    var cachedLatest: String
+        get() = prefs.getString("cachedLatest", "") ?: ""
+        set(value) = prefs.edit().putString("cachedLatest", value).apply()
+
+    /** When latest.json was last fetched (ms), used to throttle re-checks. */
+    var lastUpdateCheckAt: Long
+        get() = prefs.getLong("lastUpdateCheckAt", 0L)
+        set(value) = prefs.edit().putLong("lastUpdateCheckAt", value).apply()
+
+    /** Highest app versionCode the user has dismissed the update banner for. */
+    var dismissedUpdateVersionCode: Int
+        get() = prefs.getInt("dismissedUpdateVersionCode", 0)
+        set(value) = prefs.edit().putInt("dismissedUpdateVersionCode", value).apply()
+
+    /** Highest app versionCode we've already fired an update notification for
+     *  (so a single new release notifies once, not every sync pass). */
+    var notifiedUpdateVersionCode: Int
+        get() = prefs.getInt("notifiedUpdateVersionCode", 0)
+        set(value) = prefs.edit().putInt("notifiedUpdateVersionCode", value).apply()
+
     companion object {
         /** Back up only the device camera folder (DCIM). The default. */
         const val MODE_CAMERA = "camera"

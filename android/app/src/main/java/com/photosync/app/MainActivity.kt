@@ -1,9 +1,11 @@
 package com.photosync.app
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -59,6 +61,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var setupStep2: TextView
     private lateinit var setupStep3: TextView
     private lateinit var inviteCard: View
+    private lateinit var updateBanner: View
+    private lateinit var updateVersionText: TextView
+    private lateinit var updateNotesText: TextView
+    private var pendingUpdate: UpdateChecker.AppUpdate? = null
     private lateinit var previewController: VideoPreviewController
 
     /** All scanned items (the chosen backup source). */
@@ -135,6 +141,20 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.inviteDismissButton).setOnClickListener { dismissInviteCard() }
 
+        updateBanner = findViewById(R.id.updateBanner)
+        updateVersionText = findViewById(R.id.updateVersionText)
+        updateNotesText = findViewById(R.id.updateNotesText)
+        findViewById<View>(R.id.updateActionButton).setOnClickListener {
+            pendingUpdate?.let { openUrl(it.url) }
+        }
+        findViewById<View>(R.id.updateWhatsNewButton).setOnClickListener {
+            pendingUpdate?.let { openUrl(it.notesUrl.ifEmpty { it.url }) }
+        }
+        findViewById<View>(R.id.updateDismissButton).setOnClickListener {
+            pendingUpdate?.let { prefs.dismissedUpdateVersionCode = it.versionCode }
+            updateBanner.visibility = View.GONE
+        }
+
         val previewPlayer: PlayerView = findViewById(R.id.previewPlayer)
         val previewChipContainer: View = findViewById(R.id.previewChipContainer)
         val previewDurationText: TextView = findViewById(R.id.previewDurationText)
@@ -185,6 +205,8 @@ class MainActivity : AppCompatActivity() {
         // Reflect any changes made in Settings (name / server) immediately.
         updateSetupState()
         if (hasMediaPermission()) refresh()
+        renderUpdateBanner()
+        maybeRefreshUpdate()
     }
 
     /**
@@ -312,6 +334,53 @@ class MainActivity : AppCompatActivity() {
     private fun dismissInviteCard() {
         prefs.inviteCardDismissed = true
         inviteCard.visibility = View.GONE
+    }
+
+    /**
+     * Shows the "update available" banner from the cached latest.json, unless
+     * this build is already current or the user dismissed this version. Renders
+     * instantly (no network) so the banner is there the moment the app opens.
+     */
+    private fun renderUpdateBanner() {
+        val update = UpdateChecker.appUpdateFrom(prefs.cachedLatest, BuildConfig.VERSION_CODE)
+        if (update == null || prefs.dismissedUpdateVersionCode >= update.versionCode) {
+            pendingUpdate = null
+            updateBanner.visibility = View.GONE
+            return
+        }
+        pendingUpdate = update
+        updateVersionText.text = getString(R.string.update_banner_version, update.versionName)
+        if (update.notes.isNotEmpty()) {
+            updateNotesText.text = update.notes.joinToString("\n") { "•  $it" }
+            updateNotesText.visibility = View.VISIBLE
+        } else {
+            updateNotesText.visibility = View.GONE
+        }
+        updateBanner.visibility = View.VISIBLE
+    }
+
+    /** Refreshes the cached latest.json at most every few hours, then re-renders. */
+    private fun maybeRefreshUpdate() {
+        val sixHours = 6 * 60 * 60 * 1000L
+        val fresh = prefs.cachedLatest.isNotEmpty() &&
+            System.currentTimeMillis() - prefs.lastUpdateCheckAt < sixHours
+        if (fresh) return
+        lifecycleScope.launch {
+            val body = withContext(Dispatchers.IO) { UpdateChecker.fetch() } ?: return@launch
+            prefs.cachedLatest = body
+            prefs.lastUpdateCheckAt = System.currentTimeMillis()
+            renderUpdateBanner()
+        }
+    }
+
+    /** Opens an external link (download / release notes) in the browser. */
+    private fun openUrl(url: String) {
+        if (url.isEmpty()) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, url, Toast.LENGTH_LONG).show()
+        }
     }
 
     /** Hands the ordered media list to the viewer and opens it at [mediaIndex]. */

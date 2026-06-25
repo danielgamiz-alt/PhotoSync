@@ -85,12 +85,19 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-GitHub Actions then builds **two** downloads and attaches both to one Release:
+GitHub Actions then builds the downloads and attaches them to one Release:
 
-- `PhotoSync-v0.2.0.apk` — the signed Android app (the `build` job).
+- `PhotoSync-v0.2.0.apk` — the signed Android app (the `build` job). A copy is
+  also attached as a fixed-named `PhotoSync.apk` so the landing page and the
+  in-app updater can link to a stable `…/releases/latest/download/PhotoSync.apk`.
 - `PhotoSync-Server-Windows-v0.2.0.zip` — the portable Windows server: a
   self-contained folder (bundled Node + `PhotoServer.exe`) that family extract
-  and double-click, no install or Node needed (the `windows-server` job).
+  and double-click, no install or Node needed (the `windows-server` job). Also
+  attached fixed-named as `PhotoSync-Server-Windows.zip`.
+- `latest.json` — a small manifest (version, download URL, and a "what's new"
+  list built from the commits since the previous tag) that the phone app reads
+  to power its in-app update banner + notification. Generated automatically; no
+  action needed.
 
 Watch it under the repo's **Actions** tab; both files appear under **Releases**.
 
@@ -140,6 +147,14 @@ PhotoSync needs **two** things set up, and the computer comes first:
 ## Updating later
 
 When you publish a new release, friends install the new APK the same way — it
-upgrades in place (same signing key) and keeps their data. The in-app update
-banner / notification (planned) will point them to the latest release page
-automatically.
+upgrades in place (same signing key) and keeps their data.
+
+They don't have to check manually: the app compares its own version against the
+`latest.json` published with each release (fetched over Wi-Fi, no Play Store
+needed) and shows a **dismissible "Update available" banner** on the main screen
+plus a **one-time notification**, each listing what's new and opening the APK
+download. So bumping the tag is all you do — existing users get told.
+
+> First switch only: anyone still on a **debug** APK (signed with a per-machine
+> key) must uninstall once and install a release APK before in-place updates and
+> the update prompts work. After that, every future release updates in place.
