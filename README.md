@@ -20,15 +20,26 @@ external SSD, whatever you point it at.
 | [`desktop/`](desktop/) | A Windows **tray app + dashboard** that runs the backend for you (no terminal). | Windows |
 | [`android/`](android/) | The **PhotoSync** phone app | Android 8.0+ |
 
-> **On Windows, the easiest way to run the backend is the [desktop app](desktop/)** —
-> a tray icon plus a settings dashboard where you can pick the backup folder, see
-> status, auto-start on login, and get notifications. The sections below describe
-> the underlying server (which the desktop app runs for you).
->
-> **Non-technical users don't need any of the steps below.** Download
-> `PhotoSync-Server-Windows-*.zip` from the [latest release](https://github.com/danielgamiz-alt/PhotoServer/releases/latest),
-> extract it, and double-click `PhotoServer.exe` — no Node, no terminal. It then
-> starts automatically on every restart. The CLI sections below are for developers.
+## Download & install — the easy way
+
+**👉 [danielgamiz-alt.github.io/PhotoServer](https://danielgamiz-alt.github.io/PhotoServer/)** — the download page with both apps and picture-by-picture instructions. Or scan:
+
+<img src="docs/qr-download.png" alt="QR code to the PhotoSync download page" width="180">
+
+No terminal, no Node.js, no install wizard. Two double-clicks and you're done:
+
+**On the home PC (set up once, ~1 minute):**
+
+1. Download **PhotoSync Server for Windows** (the `.zip`) from the page above and **Extract All**.
+2. Double-click **`PhotoServer.exe`**. (First time, Windows SmartScreen → *More info → Run anyway* — normal for free apps outside the Store.)
+3. A dashboard opens and a green tray icon appears by the clock. Click **Browse…** and pick where photos should go (an external drive is ideal).
+
+That's it — it then **starts on its own every time the PC turns on**. No terminal stays open.
+
+**On each phone:** install the **PhotoSync** app from the same page, allow photo access, and tap **Find server** while on home Wi‑Fi. Backups begin automatically.
+
+> The rest of this README is for **developers** who want to run from source, change
+> settings by hand, or build their own client. Everyday users don't need any of it.
 
 ## How it works
 
@@ -45,6 +56,10 @@ external SSD, whatever you point it at.
 ---
 
 # Part 1 — The server (backend)
+
+> Everyday users should use the [one-click Windows app](#download--install--the-easy-way)
+> above instead — it runs everything below for you. This section is for running the
+> raw backend from source.
 
 ## Start it
 
@@ -148,6 +163,10 @@ phones won't find the server; allow it manually under
 
 ## Run automatically on boot (Windows)
 
+> The [desktop app](desktop/) does this for you — "Start automatically when I log in"
+> is on by default after its first run. The manual method below is only needed if
+> you're running the raw backend without the desktop app.
+
 Press `Win+R`, type `shell:startup`, and put a shortcut to
 [`server/start-server.bat`](server/start-server.bat) in the folder that opens.
 The server will then start whenever you log in.
@@ -164,6 +183,10 @@ npm test
 # Part 2 — The phone app (PhotoSync)
 
 ## Install
+
+> Everyday users just install the APK from the
+> [download page](#download--install--the-easy-way) — no build needed. The steps
+> below are for building it yourself.
 
 Open `android/` in Android Studio and **Build → Build App Bundle(s)/APK(s) →
 Build APK(s)** (or run `gradlew assembleDebug`). The APK appears in

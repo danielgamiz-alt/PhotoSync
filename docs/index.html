@@ -126,6 +126,15 @@
     </div>
   </section>
 
+  <section style="text-align:center">
+    <h2>Share this page</h2>
+    <p class="note" style="margin-bottom:20px">Setting up the family's phones? Show them this code — scanning it with a phone camera opens this page, so they can grab the app themselves.</p>
+    <div class="qr" style="margin-top:0">
+      <div class="card"><div id="qrcode-page"></div></div>
+      <span>Scan to open this page on a phone</span>
+    </div>
+  </section>
+
   <footer>
     Free &amp; open source · <a href="https://github.com/danielgamiz-alt/PhotoServer">github.com/danielgamiz-alt/PhotoServer</a><br>
     Your photos stay on your own hardware.
@@ -137,6 +146,12 @@
   new QRCode(document.getElementById("qrcode"), {
     text: "https://github.com/danielgamiz-alt/PhotoServer/releases/latest",
     width: 180, height: 180,
+    colorDark: "#101114", colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  new QRCode(document.getElementById("qrcode-page"), {
+    text: "https://danielgamiz-alt.github.io/PhotoServer/",
+    width: 160, height: 160,
     colorDark: "#101114", colorLight: "#ffffff",
     correctLevel: QRCode.CorrectLevel.M
   });
