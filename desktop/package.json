@@ -8,7 +8,7 @@
     "build-icons": "node assets/generate-icons.js",
     "sync-tokens": "node -e \"require('fs').copyFileSync('../docs/tokens.css','public/tokens.css')\"",
     "package": "powershell -NoProfile -File build-portable.ps1",
-    "test": "node test/control-test.js && node test/gallery-test.js"
+    "test": "node test/control-test.js && node test/gallery-test.js && node test/single-instance-test.js"
   },
   "dependencies": {
     "node-notifier": "^10.0.1",

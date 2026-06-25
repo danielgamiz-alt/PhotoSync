@@ -58,10 +58,12 @@ function openDashboard() {
 // Single-instance probe: if a copy is already running it answers on the private
 // dashboard port. Resolves true only for *our* dashboard (JSON status), so an
 // unrelated program squatting the port doesn't fool us.
-function isAnotherInstanceRunning() {
+function isAnotherInstanceRunning(host = CONTROL_HOST, port = CONTROL_PORT) {
   return new Promise((resolve) => {
     const req = http.get(
-      { host: CONTROL_HOST, port: CONTROL_PORT, path: '/api/status', timeout: 1500 },
+      // agent:false → a fresh one-shot connection, never a pooled keep-alive
+      // socket (which can linger and skew a quick probe like this).
+      { host, port, path: '/api/status', timeout: 1500, agent: false },
       (res) => {
         let body = '';
         res.setEncoding('utf8');
@@ -512,7 +514,13 @@ async function main() {
   console.log(`PhotoSync Server desktop running. Dashboard: ${CONTROL_URL}`);
 }
 
-main().catch((err) => {
-  console.error('fatal:', err);
-  process.exit(1);
-});
+// Only boot when launched directly (`node src/main.js`); when required from a
+// test, expose the pieces worth checking without starting the whole app.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('fatal:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { main, isAnotherInstanceRunning };

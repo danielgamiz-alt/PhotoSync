@@ -105,6 +105,9 @@
     <string name="help_q_background">Do I need to keep the app open?</string>
     <string name="help_a_background">No — the app on your phone doesn\'t need to be open. Once set up, it backs up automatically in the background about every 15 minutes while you\'re on home Wi‑Fi, and you can tap \"Sync now\" anytime from the menu.\n\nWhat does need to be running is the PhotoSync Server on your computer, since that\'s where the photos are stored. By default it starts automatically with the computer and runs quietly in the background, so as long as the computer is on, your backups keep working.</string>
 
+    <string name="help_q_locked">Does it back up while my phone is locked?</string>
+    <string name="help_a_locked">Yes. While it\'s uploading you\'ll see a \"Backing up…\" notification, and it keeps going with the screen off as long as you\'re on home Wi‑Fi.\n\nIf backups seem to stop when the phone is locked or idle, your phone\'s battery saver may be putting the app to sleep. To prevent that, open Android <b>Settings ▸ Apps ▸ PhotoSync ▸ Battery</b> and set it to <b>Unrestricted</b>. (Some phones — Samsung, Xiaomi, OnePlus and others — are especially aggressive about this.)</string>
+
     <string name="help_q_missing">Why haven\'t my latest photos backed up yet?</string>
     <string name="help_a_missing">Check that you\'re on your home Wi‑Fi and the computer is on. Backups run periodically and resume on their own — pull down on the gallery to refresh, or use \"Sync now\".</string>
 
