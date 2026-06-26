@@ -36,23 +36,33 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val prefs = SyncPrefs(applicationContext)
 
+        // These logs are the whole point of the worker being debuggable from the
+        // outside: `adb logcat -s PhotoSync` (or forcing a run with
+        // `adb shell cmd jobscheduler run -f com.photosync.app <id>`) then shows
+        // exactly why a pass did or didn't upload, instead of a silent no-op.
+        Log.i(TAG, "sync pass starting (tags=$tags, runAttempt=$runAttemptCount)")
+
         // Piggyback a (throttled) update check on every pass so a new release is
         // surfaced in the background, not just when the app is opened.
         checkForUpdates(prefs)
 
         if (prefs.serverUrl.isEmpty()) {
+            Log.i(TAG, "no server configured — nothing to do")
             prefs.lastSyncStatus = "No server configured"
             return@withContext Result.success()
         }
 
         if (prefs.username.isEmpty()) {
+            Log.i(TAG, "no account name set — nothing to do")
             prefs.lastSyncStatus = "Set your name in Settings to back up"
             return@withContext Result.success()
         }
 
         SyncEvents.syncing.value = true
         try {
-            runPass(prefs)
+            val result = runPass(prefs)
+            Log.i(TAG, "sync pass finished: ${prefs.lastSyncStatus} -> $result")
+            result
         } finally {
             SyncEvents.syncing.value = false
             SyncEvents.uploadingItemId.value = null
@@ -153,18 +163,22 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
     private suspend fun runPass(prefs: SyncPrefs): Result {
         val api = ServerApi(prefs.serverUrl, prefs.apiKey, prefs.username)
-        if (api.health() == null) {
+        val health = api.health()
+        if (health == null) {
             // Server not reachable right now (e.g. PC is off). That's normal;
             // the next periodic run will try again.
+            Log.i(TAG, "server unreachable at ${prefs.serverUrl} — will retry next pass")
             prefs.lastSyncStatus = "Server offline, will retry"
             return Result.success()
         }
+        Log.i(TAG, "server reachable: \"${health.name}\" has ${health.fileCount} files")
 
         val log = UploadLog.get(applicationContext)
         val done = log.uploadedIds()
         val pending = MediaScanner.itemsForBackup(applicationContext, prefs)
             .filter { it.id !in done }
             .sortedBy { it.dateAddedSec } // oldest first
+        Log.i(TAG, "${pending.size} item(s) pending backup")
 
         if (pending.isEmpty()) {
             prefs.lastSyncTime = System.currentTimeMillis()
@@ -216,6 +230,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                     log.markUploaded(item.id, hash)
                     SyncEvents.notifyChanged()
                     setProgress(uploaded + skipped, batch.size)
+                    Log.i(TAG, "uploaded ${item.displayName} ($uploaded/${batch.size})")
                 } catch (e: Exception) {
                     Log.w(TAG, "upload failed for ${item.displayName}", e)
                     errors++

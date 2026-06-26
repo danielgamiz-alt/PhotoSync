@@ -25,6 +25,8 @@ android {
         // CI passes the tag-derived values; local builds fall back to these.
         versionCode = (project.findProperty("versionCodeOverride") as String?)?.toIntOrNull() ?: 1
         versionName = (project.findProperty("versionNameOverride") as String?) ?: "0.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -76,4 +78,12 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    // Instrumented tests (run on a device/emulator from Android Studio):
+    // drive SyncWorker against a tiny in-process fake server, no real backup
+    // library or 15-minute waits needed.
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:core:1.5.0")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.work:work-testing:2.9.1")
 }
