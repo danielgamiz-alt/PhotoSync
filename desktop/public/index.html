@@ -32,6 +32,7 @@
       <button id="tabPhotos" class="tab active">Photos</button>
       <button id="tabTrash" class="tab">Trash</button>
       <button id="tabSettings" class="tab">Settings</button>
+      <button id="tabAbout" class="tab">About / FAQ</button>
     </nav>
     <span id="statusPill" class="pill pill-gray">…</span>
   </header>
@@ -62,6 +63,13 @@
       <div id="galleryBar" class="gallery-bar hidden">
         <span class="muted small">Showing</span>
         <select id="accountSelect" class="acct-select"></select>
+      </div>
+      <div id="galleryLoading" class="gallery-loading hidden">
+        <div class="spinner"></div>
+      </div>
+      <div id="galleryError" class="gallery-error hidden">
+        <p class="muted">Could not load photos.</p>
+        <button id="retryLoad" class="btn">Retry</button>
       </div>
       <p id="galleryEmpty" class="muted gallery-empty hidden">No photos backed up yet. Once your phone uploads, they'll appear here.</p>
       <div id="gallery"></div>
@@ -188,6 +196,69 @@
         <p class="muted small">Quitting stops backups until you start the app again.</p>
       </div>
     </section>
+
+    <!-- ================= ABOUT / FAQ ================= -->
+    <section id="aboutView" class="hidden about-wrap">
+
+      <!-- Support Development — first -->
+      <div class="card">
+        <h2>Support development</h2>
+        <p class="muted small">I'm a father, engineer, and product builder. I started PhotoSync because photo storage has become expensive and subscription-heavy — yet external drives are cheap and most people already own a computer at home. I wanted a simpler alternative that gives people control over their own photos.</p>
+        <p class="muted small">It's developed in my evenings and weekends. If you find it valuable, you can buy me a coffee — every contribution helps me spend more time building and improving the app.</p>
+        <div class="btnrow" style="margin-top:12px">
+          <a href="https://ko-fi.com/danielgamiz" target="_blank" class="btn">☕ Buy me a coffee</a>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="card">
+        <h2>How PhotoSync works</h2>
+        <p class="muted small">PhotoSync backs up your phone's photos and videos straight to your family's own computer at home — not to a company's cloud. That's what keeps it private and free.</p>
+        <p class="muted small">Because the photos go to that computer, your phone can only back them up when both are on the same home Wi‑Fi and the computer is turned on.</p>
+      </div>
+
+      <!-- FAQ -->
+      <div class="card">
+        <h2>Common questions</h2>
+
+        <div class="faq-item">
+          <p class="faq-q">Why does it only work on my home Wi‑Fi?</p>
+          <p class="faq-a muted small">Your photos are saved on your own computer at home, not on the internet. For now PhotoSync backs up only while your phone and that computer share the same home Wi‑Fi — it's the simplest and safest way to reach it, and since most people are home every day your photos still get backed up regularly. On mobile data or a different Wi‑Fi — work, a café, a friend's house — backups simply pause and pick up again automatically once you're home.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Why do I need to add a server?</p>
+          <p class="faq-a muted small">Unlike Google Photos, no company is storing your pictures. The "server" is just this free <b>PhotoSync Server</b> app running on your household's computer — that's where your photos are kept. The app on your phone needs its address so it knows where to send them. Tap "Find server" in the phone app while at home and it's usually detected automatically.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Are my photos uploaded to the internet?</p>
+          <p class="faq-a muted small">No. They go only to your own computer on your home network and stay on its drive. Nothing is sent to the cloud or to us.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Do I need to keep the app open?</p>
+          <p class="faq-a muted small">The phone app doesn't need to stay open — once set up, it backs up automatically in the background about every 15 minutes while on home Wi‑Fi.<br><br>PhotoSync Server (this app) does need to be running on the computer, since that's where photos are stored. By default it starts automatically with Windows and runs quietly in the background.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Why doesn't it upload right away?</p>
+          <p class="faq-a muted small">It backs up on its own — but not always instantly. Android limits what apps can do in the background to save battery, so a new photo can take a little while to appear. Nothing is ever lost — it always catches up.<br><br>To make backups happen sooner: plug the phone in to charge (Android lifts its background limits while charging), stay on home Wi‑Fi, or open the PhotoSync app to trigger an immediate sync.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Why haven't my latest photos backed up yet?</p>
+          <p class="faq-a muted small">Check that your phone is on home Wi‑Fi and this computer is on and running PhotoSync Server. Backups run periodically and resume on their own — you can also tap "Sync now" in the phone app.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Is it really free?</p>
+          <p class="faq-a muted small">Yes. PhotoSync is free and open source, and because the storage is your own computer there's no subscription and no limit beyond your own drive. It's built by one person on evenings and weekends — if it's useful to you, a small tip helps keep it going (entirely optional).</p>
+        </div>
+      </div>
+
+    </section>
+
   </main>
 
   <!-- Full-screen viewer -->
