@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Always-dark theme to match the new Aperture icon's dark field. -->
-    <style name="Theme.PhotoSync" parent="Theme.Material3.Dark">
+    <style name="Theme.PhotoSync" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:colorBackground">@color/bg</item>
         <item name="android:windowBackground">@color/bg</item>
         <item name="colorSurface">@color/surface</item>
