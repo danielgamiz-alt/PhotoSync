@@ -18,6 +18,7 @@
   padding: 8px 16px; font-size: 13.5px;
   background: rgba(46, 160, 67, 0.10); color: var(--text);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .status-strip.warn { background: rgba(183, 121, 31, 0.14); }
 
@@ -126,7 +127,7 @@
 
 /* ---- selection bar ---- */
 .selbar {
-  position: sticky; top: 0; z-index: 20;
+  flex-shrink: 0; z-index: 20;
   display: flex; align-items: center; gap: 12px;
   padding: 10px 18px; background: var(--accent); color: #fff;
 }

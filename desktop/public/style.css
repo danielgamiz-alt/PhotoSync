@@ -16,6 +16,11 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
+  /* Fixed-height shell: header + strips stay put, only <main> scrolls */
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 header {
@@ -23,6 +28,7 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 16px 24px;
+  flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -39,6 +45,9 @@ header {
 /* Full-width so the gallery fills the screen. The Settings panel re-centers
    itself with its own max-width (.settings-wrap). */
 main {
+  flex: 1;
+  min-height: 0; /* required for flex children to scroll */
+  overflow-y: auto;
   padding: 0;
 }
 

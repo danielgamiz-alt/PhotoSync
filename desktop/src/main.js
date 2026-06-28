@@ -156,11 +156,16 @@ async function main() {
   photoServer.on('started', () => syncTray());
   photoServer.on('stopped', () => syncTray());
 
+  // Kick off background thumbnail warmup (non-blocking).
+  thumbnailer.warmUp(storage.list()).catch(() => {});
+
   let storedBatch = 0;
   let storedTimer = null;
-  photoServer.on('stored', ({ path: rel }) => {
+  photoServer.on('stored', ({ path: rel, hash }) => {
     lastUploadAt = Date.now();
     mirrorCopy(rel); // also copy to the second drive, if configured
+    // Warm up the new file's thumbnail + blur in the background.
+    thumbnailer.warmUp([storage.get(hash) ? { ...storage.get(hash), hash, path: rel } : { hash, path: rel, type: 'image' }]).catch(() => {});
     storedBatch++;
     syncTrayThrottled();
     clearTimeout(storedTimer);
@@ -363,9 +368,11 @@ async function main() {
       config.storagePath = resolved;
       persistConfig();
       // Re-point the shared storage at the new folder (gallery + uploader).
+      thumbnailer.cancelWarmUp();
       storage = new Storage(config.storagePath);
       await storage.init();
       photoServer.storage = storage;
+      thumbnailer.warmUp(storage.list()).catch(() => {});
       activityLog.add('info', `Storage folder set to ${config.storagePath}`);
       if (photoServer.running) await safeRestart();
       return getStatus();

@@ -74,6 +74,14 @@ class Storage {
     return total;
   }
 
+  /** Total bytes stored across all users (sums the size field in the index). */
+  totalBytes() {
+    let total = 0;
+    for (const byUser of Object.values(this.index))
+      for (const e of Object.values(byUser)) total += e.size || 0;
+    return total;
+  }
+
   /** Files stored for one user. */
   countFor(username = DEFAULT_USER) {
     let total = 0;

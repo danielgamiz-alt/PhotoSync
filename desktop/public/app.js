@@ -137,11 +137,12 @@ function renderStatusStrip(s) {
     text = "No photos backed up yet — once your phone uploads, they'll appear here.";
   } else {
     const stale = s.lastUploadAt && Date.now() - s.lastUploadAt > 3 * 86400000;
+    const sizeStr = s.storedBytes ? ` (${fmtBytes(s.storedBytes)})` : '';
     if (stale) {
       warn = true;
-      text = `⚠ ${s.fileCount.toLocaleString()} photos backed up — but nothing new in ${fmtAgo(s.lastUploadAt)}.`;
+      text = `⚠ ${s.fileCount.toLocaleString()} photos backed up${sizeStr} — but nothing new in ${fmtAgo(s.lastUploadAt)}.`;
     } else {
-      text = `✓ ${s.fileCount.toLocaleString()} photos backed up · last received ${fmtAgo(s.lastUploadAt)}`;
+      text = `✓ ${s.fileCount.toLocaleString()} photos backed up${sizeStr} · last received ${fmtAgo(s.lastUploadAt)}`;
     }
   }
   if (s.mirror && s.mirror.enabled && !s.mirror.connected) {

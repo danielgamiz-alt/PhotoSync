@@ -45,6 +45,7 @@ class PhotoServer extends EventEmitter {
       port: this.config.port,
       storagePath: this.config.storagePath,
       fileCount: this.storage ? this.storage.count() : 0,
+      storedBytes: this.storage ? this.storage.totalBytes() : 0,
       requiresApiKey: this.config.apiKey !== '',
       addresses: lanAddresses(),
     };
