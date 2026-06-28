@@ -10,12 +10,32 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Support / donations — shown first so it's seen before FAQ -->
+        <!-- About -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/help_title"
+            android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/help_intro"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="24dp"
+            android:background="?android:attr/listDivider" />
+
+        <!-- Support / donations — between About and the FAQ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/support_title"
-            android:textAppearance="?attr/textAppearanceTitleLarge" />
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <TextView
             android:layout_width="match_parent"
@@ -38,27 +58,7 @@
             android:layout_marginVertical="24dp"
             android:background="?android:attr/listDivider" />
 
-        <!-- Plain-language explanation -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/help_title"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/help_intro"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginVertical="24dp"
-            android:background="?android:attr/listDivider" />
-
-        <!-- FAQ -->
+        <!-- Common questions — each tap-to-expand (answers start collapsed). -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -66,124 +66,138 @@
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <TextView
+            android:id="@+id/qWifi"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_wifi"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aWifi"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_wifi"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/qServer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_server"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aServer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_server"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/qInternet"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_internet"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aInternet"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_internet"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/qBackground"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_background"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aBackground"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_background"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/qLocked"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/help_q_timing"
-            android:textAppearance="?attr/textAppearanceTitleSmall" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/help_a_timing"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_locked"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aLocked"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_locked"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/qMissing"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_missing"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aMissing"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_missing"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/qFree"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="12dp"
             android:text="@string/help_q_free"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
+            android:id="@+id/aFree"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:text="@string/help_a_free"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/text_secondary" />
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
     </LinearLayout>
 </ScrollView>

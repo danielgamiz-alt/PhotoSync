@@ -294,10 +294,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 true
             }
-            R.id.action_setup_computer -> {
-                startActivity(Intent(this, ComputerSetupActivity::class.java))
-                true
-            }
             R.id.action_invite -> {
                 shareApp()
                 true

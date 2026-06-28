@@ -1,5 +1,8 @@
 package com.photosync.app
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -34,7 +37,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var tryAgainButton: Button
     private lateinit var syncStatus: TextView
     private lateinit var autoSyncSwitch: SwitchCompat
-    private lateinit var videosSwitch: SwitchCompat
     private lateinit var videosOnlySwitch: SwitchCompat
     private lateinit var backupSourceSummary: TextView
 
@@ -61,7 +63,6 @@ class SettingsActivity : AppCompatActivity() {
         tryAgainButton = findViewById(R.id.tryAgainButton)
         syncStatus = findViewById(R.id.syncStatus)
         autoSyncSwitch = findViewById(R.id.autoSyncSwitch)
-        videosSwitch = findViewById(R.id.videosSwitch)
         videosOnlySwitch = findViewById(R.id.videosOnlySwitch)
         backupSourceSummary = findViewById(R.id.backupSourceSummary)
 
@@ -77,16 +78,26 @@ class SettingsActivity : AppCompatActivity() {
         serverUrlInput.setText(prefs.serverUrl)
         apiKeyInput.setText(prefs.apiKey)
         autoSyncSwitch.isChecked = prefs.autoSyncEnabled
-        videosSwitch.isChecked = prefs.includeVideos
         videosOnlySwitch.isChecked = prefs.videosOnly
-        updateVideoSwitchState()
 
         findViewById<Button>(R.id.discoverButton).setOnClickListener { discoverServers() }
         findViewById<Button>(R.id.testButton).setOnClickListener { testConnection() }
         findViewById<Button>(R.id.syncNowButton).setOnClickListener { syncNow() }
         tryAgainButton.setOnClickListener { discoverServers() }
+
+        // "Set up the computer" instructions live inline (collapsed) rather than
+        // on a separate screen. The toggle expands them; the no-server help
+        // button expands the panel straight away.
+        val setupComputerPanel = findViewById<View>(R.id.setupComputerPanel)
+        findViewById<TextView>(R.id.setupUrlText).text = getString(R.string.landing_url)
+        findViewById<View>(R.id.setupComputerToggle).setOnClickListener {
+            setupComputerPanel.visibility =
+                if (setupComputerPanel.visibility == View.GONE) View.VISIBLE else View.GONE
+        }
+        findViewById<View>(R.id.sendLinkButton).setOnClickListener { sendSetupLink() }
+        findViewById<View>(R.id.copyLinkButton).setOnClickListener { copySetupLink() }
         findViewById<Button>(R.id.setupComputerButton).setOnClickListener {
-            startActivity(Intent(this, ComputerSetupActivity::class.java))
+            setupComputerPanel.visibility = View.VISIBLE
         }
 
         autoSyncSwitch.setOnCheckedChangeListener { _, checked ->
@@ -100,17 +111,28 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        videosSwitch.setOnCheckedChangeListener { _, checked -> prefs.includeVideos = checked }
-
         videosOnlySwitch.setOnCheckedChangeListener { _, checked ->
             prefs.videosOnly = checked
-            updateVideoSwitchState()
         }
     }
 
-    /** "Include videos" is moot while backing up videos only, so lock it on. */
-    private fun updateVideoSwitchState() {
-        videosSwitch.isEnabled = !prefs.videosOnly
+    /** Share the landing-page link to yourself, to open on the computer. */
+    private fun sendSetupLink() {
+        val url = getString(R.string.landing_url)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, getString(R.string.invite_subject))
+            putExtra(Intent.EXTRA_TEXT, getString(R.string.invite_text, url))
+        }
+        startActivity(Intent.createChooser(send, getString(R.string.setup_computer_send_chooser)))
+    }
+
+    /** Copy the landing-page link so it can be pasted on the computer. */
+    private fun copySetupLink() {
+        val url = getString(R.string.landing_url)
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("PhotoSync", url))
+        Toast.makeText(this, R.string.setup_computer_link_copied, Toast.LENGTH_SHORT).show()
     }
 
     override fun onSupportNavigateUp(): Boolean {
