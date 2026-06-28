@@ -25,9 +25,11 @@
     $('tabPhotos').classList.toggle('active', tab === 'photos');
     $('tabTrash').classList.toggle('active', tab === 'trash');
     $('tabSettings').classList.toggle('active', tab === 'settings');
+    $('tabAbout').classList.toggle('active', tab === 'about');
     $('galleryView').classList.toggle('hidden', tab !== 'photos');
     $('trashView').classList.toggle('hidden', tab !== 'trash');
     $('settingsView').classList.toggle('hidden', tab !== 'settings');
+    $('aboutView').classList.toggle('hidden', tab !== 'about');
     // The photo selection bar belongs to the Photos tab only.
     if (tab !== 'photos') $('selectionBar').classList.add('hidden');
     else if (selected.size > 0) $('selectionBar').classList.remove('hidden');
@@ -36,6 +38,7 @@
   $('tabPhotos').onclick = () => showTab('photos');
   $('tabTrash').onclick = () => showTab('trash');
   $('tabSettings').onclick = () => showTab('settings');
+  $('tabAbout').onclick = () => showTab('about');
 
   // ---- date helpers --------------------------------------------------------
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -62,14 +65,27 @@
     String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ---- fetch + render ------------------------------------------------------
+  let mediaLoading = false;
   async function loadMedia() {
+    if (mediaLoading) return;
+    mediaLoading = true;
+    $('galleryError').classList.add('hidden');
+    // Show spinner only on the very first load (gallery is empty).
+    const firstLoad = $('gallery').children.length === 0 && media.length === 0;
+    if (firstLoad) $('galleryLoading').classList.remove('hidden');
+
     let data;
     const q = currentAccount == null ? '' : `?account=${encodeURIComponent(currentAccount)}`;
     try {
       data = await fetch('/api/media' + q).then((r) => r.json());
     } catch {
+      $('galleryLoading').classList.add('hidden');
+      if (firstLoad) $('galleryError').classList.remove('hidden');
+      mediaLoading = false;
       return; // disconnected — app.js shows the banner
     }
+    $('galleryLoading').classList.add('hidden');
+    mediaLoading = false;
     accounts = data.accounts || [];
 
     // First visit (no saved choice): default to YOUR account — the owner of the
@@ -167,6 +183,8 @@
     // viewport (see setupLazyLoad). With a big library this is the difference
     // between thousands of immediate requests and just the few around the
     // scroll position.
+    // If a tiny blur placeholder is available it is set as the immediate src
+    // so tiles are never blank while the real thumbnail loads.
     if (m.type === 'video') {
       return `<div class="tile video-tile" data-index="${i}" data-hash="${m.hash}">
         <video muted data-src="/media/file?hash=${m.hash}#t=0.1"></video>
@@ -174,8 +192,11 @@
         <div class="tile-check">✓</div>
       </div>`;
     }
+    const blurAttr = m.blur
+      ? ` src="${m.blur}" data-blur="${m.blur}" class="thumb-blur"`
+      : '';
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
-      <img data-src="/media/thumb?hash=${m.hash}" alt="">
+      <img${blurAttr} data-src="/media/thumb?hash=${m.hash}" alt="">
       <div class="tile-check">✓</div>
     </div>`;
   }
@@ -185,19 +206,70 @@
   // the source again once it's scrolled well out of view, so memory and network
   // stay bounded no matter how large the library is. The generous rootMargin
   // preloads a screenful or two ahead so scrolling feels instant.
+  //
+  // A small concurrency queue (MAX_THUMB_INFLIGHT) prevents fast scrolling from
+  // flooding the server — it serialises requests so Node's thumbnailer can keep
+  // up and the tiles closest to the viewport load first.
+  const MAX_THUMB_INFLIGHT = 6;
+  let thumbInflight = 0;
+  const thumbQueue = []; // [{img, src, handler}]
+  function drainThumbQueue() {
+    while (thumbInflight < MAX_THUMB_INFLIGHT && thumbQueue.length > 0) {
+      const { img, src, handler } = thumbQueue.shift();
+      // Skip if the tile was scrolled out of view before its turn came.
+      if (img.dataset.src !== src) continue;
+      thumbInflight++;
+      img.addEventListener('load', handler);
+      img.addEventListener('error', handler);
+      img.setAttribute('src', src);
+    }
+  }
+  function enqueueThumb(img, src, onDone) {
+    const handler = () => {
+      thumbInflight--;
+      img.removeEventListener('load', handler);
+      img.removeEventListener('error', handler);
+      drainThumbQueue();
+      onDone();
+    };
+    thumbQueue.push({ img, src, handler });
+    drainThumbQueue();
+  }
   let tileObserver = null;
   function loadTileMedia(el) {
     const src = el.dataset.src;
     if (!src || el.getAttribute('src') === src) return;
-    if (el.tagName === 'VIDEO') el.preload = 'metadata';
-    el.setAttribute('src', src);
+    if (el.tagName === 'VIDEO') {
+      el.preload = 'metadata';
+      el.setAttribute('src', src);
+      return;
+    }
+    // For images: queue the real thumb request, then clear the blur class on load.
+    const img = el;
+    const onLoad = () => {
+      if (img.getAttribute('src') === src) {
+        img.classList.remove('thumb-blur');
+        img.classList.add('thumb-loaded');
+      }
+    };
+    enqueueThumb(img, src, onLoad);
   }
   function unloadTileMedia(el) {
-    if (!el.hasAttribute('src')) return;
-    el.removeAttribute('src');
+    const blurSrc = el.dataset.blur;
     if (el.tagName === 'VIDEO') {
+      if (!el.hasAttribute('src')) return;
+      el.removeAttribute('src');
       el.preload = 'none';
       el.load(); // abort any in-flight metadata fetch and free the decoded frame
+      return;
+    }
+    // Restore blur placeholder if one exists, otherwise clear src.
+    el.classList.remove('thumb-loaded');
+    if (blurSrc) {
+      el.setAttribute('src', blurSrc);
+      el.classList.add('thumb-blur');
+    } else {
+      el.removeAttribute('src');
     }
   }
   function setupLazyLoad() {
@@ -211,7 +283,7 @@
           else unloadTileMedia(el);
         }
       },
-      { rootMargin: '800px 0px' }
+      { rootMargin: '2000px 0px' }
     );
     document.querySelectorAll('#gallery .tile').forEach((t) => tileObserver.observe(t));
   }
@@ -446,6 +518,8 @@
     trashSelected.clear();
     await loadTrash();
   };
+
+  $('retryLoad').onclick = () => loadMedia();
 
   // ---- polling -------------------------------------------------------------
   loadMedia();

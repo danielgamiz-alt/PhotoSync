@@ -37,7 +37,7 @@
     <string name="permission_needed">PhotoSync needs photo access to back up your pictures</string>
 
     <string name="menu_settings">Settings</string>
-    <string name="menu_help">How it works</string>
+    <string name="menu_help">About / FAQ</string>
     <string name="menu_invite">Invite a friend</string>
     <string name="menu_setup_computer">Set up the computer</string>
 
@@ -125,8 +125,8 @@
     <string name="backup_all_summary">Entire gallery</string>
 
     <!-- How it works / FAQ -->
-    <string name="help_link">How it works &amp; FAQ</string>
-    <string name="help_title">How PhotoSync works</string>
+    <string name="help_link">About / FAQ</string>
+    <string name="help_title">About &amp; FAQ</string>
     <string name="help_intro">PhotoSync backs up your phone\'s photos and videos straight to your family\'s own computer at home — not to a company\'s cloud. That\'s what keeps it private and free.\n\nBecause the photos go to that computer, your phone can only back them up when both are on the same home Wi‑Fi and the computer is turned on.</string>
     <string name="help_faq_title">Common questions</string>
 
