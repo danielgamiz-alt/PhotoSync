@@ -56,7 +56,7 @@
     <string name="setup_computer_url_label">Or type this address on your computer:</string>
     <string name="setup_computer_link_copied">Link copied</string>
     <string name="setup_computer_after">Already installed it on the computer? Go back and tap <b>Find server</b> while on your home Wi‑Fi.</string>
-    <string name="backed_up_summary">%1$d of %2$d backed up</string>
+    <string name="backed_up_pending">%1$d backed up · %2$d waiting</string>
     <string name="backed_up_all">%1$d photos backed up</string>
     <string name="gallery_empty">No photos found on this device</string>
 

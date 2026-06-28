@@ -487,8 +487,9 @@ class MainActivity : AppCompatActivity() {
                     summaryText.text = getString(R.string.server_unreachable_summary)
                     summaryProgress.visibility = View.GONE
                 } else {
-                    // Uploads still pending — show progress against the total.
-                    summaryText.text = getString(R.string.backed_up_summary, doneCount, total)
+                    // Uploads still pending — name how many are left (the count
+                    // people actually want) and show progress against the total.
+                    summaryText.text = getString(R.string.backed_up_pending, doneCount, total - doneCount)
                     summaryProgress.max = total
                     summaryProgress.progress = doneCount
                     summaryProgress.visibility = View.VISIBLE

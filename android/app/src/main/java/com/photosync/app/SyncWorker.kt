@@ -110,6 +110,32 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 
     /**
+     * Posts a quiet, tappable "backed up N photos" summary after a pass that
+     * uploaded something, noting how many are still waiting. Auto-dismissible
+     * (not ongoing), unlike the in-pass progress notification — a brief "it's
+     * working" beat rather than a permanent badge. No-op without notification
+     * permission. Reuses the low-importance backup channel so it never buzzes.
+     */
+    private fun notifyBackupSummary(uploaded: Int, remaining: Int) {
+        ensureChannel()
+        val photos = if (uploaded == 1) "1 photo" else "$uploaded photos"
+        val text = if (remaining > 0) "Backed up $photos · $remaining still waiting" else "Backed up $photos"
+        val open = PendingIntent.getActivity(
+            applicationContext, 1, Intent(applicationContext, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_status_uploading)
+            .setContentTitle("PhotoSync")
+            .setContentText(text)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .build()
+        applicationContext.getSystemService(NotificationManager::class.java)
+            .notify(COMPLETE_NOTIF_ID, notification)
+    }
+
+    /**
      * Refreshes the cached latest.json (at most every few hours) and fires a
      * one-time notification when a newer app build is available. De-spammed via
      * [SyncPrefs.notifiedUpdateVersionCode] so a release notifies once, not on
@@ -256,6 +282,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             if (remaining > 0) append(", $remaining queued")
         }
 
+        // A quiet, dismissible summary so the backup is visible without opening
+        // the app — only when something actually uploaded (no noise on idle
+        // "up to date" passes). Tells the user how many are still waiting.
+        if (uploaded > 0) notifyBackupSummary(uploaded, remaining)
+
         // Large first-time backlogs are processed in chunks; immediately
         // queue the next chunk instead of waiting for the next period.
         if (remaining > 0 && errors == 0) {
@@ -272,6 +303,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         private const val ONETIME_WORK = "photosync-now"
         private const val CHANNEL_ID = "backup-progress"
         private const val NOTIF_ID = 42
+        private const val COMPLETE_NOTIF_ID = 44
         private const val UPDATE_CHANNEL_ID = "app-updates"
         private const val UPDATE_NOTIF_ID = 43
 
