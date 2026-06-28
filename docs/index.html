@@ -41,6 +41,10 @@
   }
   .step h3 { margin: 2px 0 4px; font-size: 16px; font-weight: 600; }
   .step p { margin: 0; color: var(--muted); font-size: 15px; }
+  .step p + p { margin-top: 8px; }
+  .step ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
+  .step li { margin: 4px 0; }
+  .step li b { color: var(--text); }
   .note { background: var(--surface-2); border-radius: 12px; padding: 14px 16px; color: var(--muted); font-size: 14px; }
   .note b { color: var(--text); font-weight: 600; }
   a { color: #a98bff; }
@@ -123,6 +127,9 @@
     </div>
     <div class="step">
       <div><h3>Do I have to keep the app open?</h3><p>No. Once set up, it backs up automatically in the background while you're on home Wi‑Fi. There's also a "How it works" page inside the app if you ever forget the details.</p></div>
+    </div>
+    <div class="step">
+      <div><h3>Why doesn't it upload automatically right away?</h3><p>It does back up on its own — but not always instantly. To save battery, Android strictly limits what apps are allowed to do in the background, so a new photo can take a while to upload, and longer if the phone has been sitting locked and untouched. Nothing is ever lost: it always catches up. (This is also why a single photo backs up the moment you open the app, but the rest trickle in afterwards.)</p><p>To make backups happen sooner:</p><ul><li><b>Plug the phone in to charge.</b> Android lifts its background limits while charging, so this is when most backups happen — the same way your phone does its overnight work. On Wi‑Fi and charging is the sweet spot.</li><li><b>Stay on your home Wi‑Fi</b>, and make sure it isn't set to <b>Metered</b> (Wi‑Fi settings → your network). A "metered" Wi‑Fi pauses automatic backups.</li><li><b>Want it now? Just open PhotoSync.</b> Opening the app always kicks off a backup immediately.</li></ul></div>
     </div>
   </section>
 
