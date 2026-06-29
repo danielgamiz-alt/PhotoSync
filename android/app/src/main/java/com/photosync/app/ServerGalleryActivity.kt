@@ -118,8 +118,9 @@ class ServerGalleryActivity : AppCompatActivity() {
 
     private fun load() {
         if (prefs.serverUrl.isEmpty()) {
-            Toast.makeText(this, R.string.server_not_configured, Toast.LENGTH_LONG).show()
-            finish()
+            swipe.isRefreshing = false
+            errorDetail.text = getString(R.string.server_not_configured)
+            errorView.visibility = View.VISIBLE
             return
         }
         swipe.isRefreshing = true
