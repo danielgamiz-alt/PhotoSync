@@ -107,6 +107,10 @@
     <string name="account_hint">Your photos are backed up to their own folder on the server, under this name. Each person in your household can use their own name.</string>
     <string name="privacy_note">🔒 Your photos go only to your own computer at home — nothing is uploaded to the internet or any company.</string>
     <string name="set_name_first">Enter your name in Settings first</string>
+    <string name="username_confirm_title">Confirm your name</string>
+    <string name="username_confirm_message">Your photos will be saved to a folder named \"%1$s\" on the server.\n\nIf you share the server with others (family, housemates), make sure nobody else is already using this name — there\'s no automatic check for duplicates.</string>
+    <string name="username_confirm_save">Save</string>
+    <string name="username_confirm_cancel">Cancel</string>
 
     <!-- Backup source -->
     <string name="section_backup_source">What to back up</string>
