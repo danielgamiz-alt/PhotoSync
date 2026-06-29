@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -100,7 +101,8 @@ class ServerGalleryActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG,
                     ).show()
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // Reindex failure is non-fatal — still refresh the list.
             }
             load()
@@ -132,7 +134,12 @@ class ServerGalleryActivity : AppCompatActivity() {
                     UploadLog.get(this@ServerGalleryActivity).uploadedHashes()
                 }
 
-                val serverItems = serverDeferred.await()
+                val serverItems = try {
+                    serverDeferred.await()
+                } catch (e: Exception) {
+                    hashesDeferred.cancel()
+                    throw e
+                }
                 val localHashes = hashesDeferred.await()
 
                 val mediaItems = serverItems.map { item ->
@@ -154,6 +161,7 @@ class ServerGalleryActivity : AppCompatActivity() {
                 emptyText.visibility = if (mediaItems.isEmpty()) View.VISIBLE else View.GONE
                 rows.firstOrNull()?.sectionLabel?.let { flashDatePill(it) }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 emptyText.visibility = View.GONE
                 errorDetail.text = getString(R.string.server_gallery_offline_detail)
                 errorView.visibility = View.VISIBLE
