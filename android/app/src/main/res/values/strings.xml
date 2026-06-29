@@ -113,7 +113,7 @@
     <string name="selection_cancel">Cancel selection</string>
     <string name="selection_count">%1$d selected</string>
     <string name="action_trash">Trash</string>
-    <string name="action_delete_device">From device</string>
+    <string name="action_delete_device">Delete from device</string>
     <string name="delete_from_device">Delete from device</string>
     <string name="delete_everywhere">Delete everywhere</string>
     <string name="delete_device_confirm_title">Delete from device?</string>
