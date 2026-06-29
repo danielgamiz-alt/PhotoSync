@@ -295,7 +295,7 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             R.id.action_server_gallery -> {
-                startActivity(Intent(this, ServerGalleryActivity::class.java))
+                openServerGallery()
                 true
             }
             R.id.action_invite -> {
@@ -319,6 +319,30 @@ class MainActivity : AppCompatActivity() {
      * email…) with the install link, so people can spread PhotoSync the same
      * way they share everything else.
      */
+    private fun openServerGallery() {
+        val prefs = SyncPrefs(this)
+        if (prefs.serverUrl.isEmpty()) {
+            Toast.makeText(this, R.string.server_not_configured, Toast.LENGTH_LONG).show()
+            return
+        }
+        // Quick reachability check so the user gets feedback here rather than
+        // landing on a blank gallery screen with no explanation.
+        lifecycleScope.launch {
+            val reachable = withContext(Dispatchers.IO) {
+                ServerApi(prefs.serverUrl, prefs.apiKey, prefs.username).health(timeoutMs = 3000) != null
+            }
+            if (reachable) {
+                startActivity(Intent(this@MainActivity, ServerGalleryActivity::class.java))
+            } else {
+                Toast.makeText(
+                    this@MainActivity,
+                    R.string.server_gallery_offline_title,
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
     private fun shareApp() {
         val share = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
