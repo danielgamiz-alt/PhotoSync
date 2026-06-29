@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
@@ -77,6 +78,14 @@ class SettingsActivity : AppCompatActivity() {
         usernameInput.setText(prefs.username)
         serverUrlInput.setText(prefs.serverUrl)
         apiKeyInput.setText(prefs.apiKey)
+
+        usernameInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) maybeConfirmUsername()
+        }
+
+        onBackPressedDispatcher.addCallback(this) {
+            checkPendingUsername { finish() }
+        }
         autoSyncSwitch.isChecked = prefs.autoSyncEnabled
         videosOnlySwitch.isChecked = prefs.videosOnly
 
@@ -136,7 +145,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        finish()
+        checkPendingUsername { finish() }
         return true
     }
 
@@ -170,18 +179,48 @@ class SettingsActivity : AppCompatActivity() {
         saveAccount()
     }
 
-    /**
-     * Persists the account name. Switching accounts forgets the local
-     * backup log, since "uploaded" is tracked per server folder — the new
-     * account's folder starts empty, so everything is pending again.
-     */
     private fun saveAccount() {
+        // Username is committed only through the confirmation dialog (maybeConfirmUsername).
+        // Nothing to do here.
+    }
+
+    private fun maybeConfirmUsername() {
         val newName = usernameInput.text.toString().trim()
-        if (newName != prefs.username) {
-            prefs.username = newName
-            UploadLog.get(this).clear()
-            SyncEvents.notifyChanged()
+        if (newName == prefs.username) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.username_confirm_title)
+            .setMessage(getString(R.string.username_confirm_message, newName))
+            .setPositiveButton(R.string.username_confirm_save) { _, _ ->
+                prefs.username = newName
+                UploadLog.get(this).clear()
+                SyncEvents.notifyChanged()
+            }
+            .setNegativeButton(R.string.username_confirm_cancel) { _, _ ->
+                usernameInput.setText(prefs.username)
+            }
+            .show()
+    }
+
+    private fun checkPendingUsername(onReady: () -> Unit) {
+        val newName = usernameInput.text.toString().trim()
+        if (newName == prefs.username) {
+            onReady()
+            return
         }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.username_confirm_title)
+            .setMessage(getString(R.string.username_confirm_message, newName))
+            .setPositiveButton(R.string.username_confirm_save) { _, _ ->
+                prefs.username = newName
+                UploadLog.get(this).clear()
+                SyncEvents.notifyChanged()
+                onReady()
+            }
+            .setNegativeButton(R.string.username_confirm_cancel) { _, _ ->
+                usernameInput.setText(prefs.username)
+                onReady()
+            }
+            .show()
     }
 
     private fun discoverServers() {
