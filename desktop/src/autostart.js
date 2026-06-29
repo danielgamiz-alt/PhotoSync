@@ -31,9 +31,14 @@ function launchCommand() {
     // Packaged single-exe build: relaunch ourselves.
     return `"${process.execPath}" --minimized`;
   }
-  // Dev: node + this app's entry point.
+  // Dev: launching node.exe directly would flash a console window. Use a
+  // wscript.exe + VBScript shim instead — Shell.Run with window-style 0 starts
+  // the process completely hidden. wscript.exe ships with every Windows install.
   const main = path.join(__dirname, 'main.js');
-  return `"${process.execPath}" "${main}" --minimized`;
+  const vbs = path.join(__dirname, 'start-hidden.vbs');
+  const cmd = `"${process.execPath}" "${main}" --minimized`.replace(/"/g, '""');
+  fs.writeFileSync(vbs, `CreateObject("WScript.Shell").Run "${cmd}", 0, False\r\n`);
+  return `wscript.exe "${vbs}"`;
 }
 
 async function isEnabled() {

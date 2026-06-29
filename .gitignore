@@ -28,3 +28,4 @@ android/.idea/
 android/keystore.properties
 android/*.jks
 android/*.keystore
+desktop/src/start-hidden.vbs
