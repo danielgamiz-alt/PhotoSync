@@ -161,6 +161,8 @@
     <string name="backup_camera_summary">Camera Roll</string>
     <string name="backup_all_summary">Entire gallery</string>
 
+    <string name="app_version">PhotoSync %1$s</string>
+
     <!-- How it works / FAQ -->
     <string name="help_link">About / FAQ</string>
     <string name="help_title">About &amp; FAQ</string>

@@ -1,6 +1,7 @@
 package com.photosync.app
 
 import android.content.ClipData
+import com.photosync.app.BuildConfig
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -74,6 +75,9 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.helpLink).setOnClickListener {
             startActivity(Intent(this, HelpActivity::class.java))
         }
+
+        findViewById<TextView>(R.id.appVersionText).text =
+            getString(R.string.app_version, BuildConfig.VERSION_NAME)
 
         usernameInput.setText(prefs.username)
         serverUrlInput.setText(prefs.serverUrl)

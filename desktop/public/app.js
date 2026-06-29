@@ -119,6 +119,11 @@ function render(s) {
   $('notifications').disabled = !s.notificationsAvailable;
   $('notifyUnavailable').classList.toggle('hidden', s.notificationsAvailable);
 
+  if (s.version) {
+    $('appVersion').textContent = 'v' + s.version;
+    $('aboutVersion').textContent = 'v' + s.version;
+  }
+
   renderStatusStrip(s);
   renderMirror(s);
 }

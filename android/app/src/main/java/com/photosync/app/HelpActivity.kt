@@ -1,6 +1,7 @@
 package com.photosync.app
 
 import android.content.ActivityNotFoundException
+import com.photosync.app.BuildConfig
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -22,6 +23,9 @@ class HelpActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_help)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
+        findViewById<TextView>(R.id.helpVersionText).text =
+            getString(R.string.app_version, BuildConfig.VERSION_NAME)
 
         findViewById<MaterialButton>(R.id.supportButton).setOnClickListener {
             val url = getString(R.string.support_url)
