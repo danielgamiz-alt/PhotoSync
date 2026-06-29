@@ -27,6 +27,25 @@
   padding: 6px 4px 10px;
 }
 .gallery-bar { display: flex; align-items: center; gap: 8px; padding: 12px 4px 4px; }
+.gallery-bar-spacer { flex: 1; }
+.btn-sm { font-size: 12px; padding: 4px 10px; }
+.scan-notice {
+  margin: 4px 4px 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--ap-green, #30d158);
+  color: #fff;
+  animation: fadeIn 0.2s ease;
+}
+.scan-notice.scan-notice-muted {
+  background: var(--card);
+  color: var(--text-secondary, #888);
+  font-weight: 400;
+  border: 1px solid var(--border);
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .acct-select {
   font: inherit; font-size: 14px; font-weight: 600;
   color: var(--text); background: var(--card);

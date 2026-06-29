@@ -218,19 +218,32 @@ function action(fn) {
 
 // ---- actions ---------------------------------------------------------------
 $('reindexBtn').onclick = async () => {
-  const hint = $('reindexHint');
-  hint.textContent = 'Scanning…';
   $('reindexBtn').disabled = true;
+  $('reindexBtn').textContent = 'Scanning…';
   try {
     const res = await api('/api/reindex', 'POST');
-    hint.textContent = res.added > 0 ? `Found ${res.added} new file(s) ✓` : 'No new files found';
-    if (res.added > 0) render(await api('/api/status'));
+    if (res.added > 0) {
+      const n = res.added;
+      showScanNotice(`${n} new ${n === 1 ? 'item' : 'items'} found and synced`);
+      render(await api('/api/status'));
+      if (window.reloadGallery) window.reloadGallery();
+    } else {
+      showScanNotice('No new files found', true);
+    }
   } catch (e) {
-    hint.textContent = e.message || 'Scan failed';
+    showScanNotice(e.message || 'Scan failed', true);
   }
   $('reindexBtn').disabled = false;
-  setTimeout(() => { hint.textContent = ''; }, 5000);
+  $('reindexBtn').textContent = 'Scan for new files';
 };
+
+function showScanNotice(msg, muted = false) {
+  const el = $('scanNotice');
+  el.textContent = msg;
+  el.className = 'scan-notice' + (muted ? ' scan-notice-muted' : '');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.classList.add('hidden'); }, 6000);
+}
 
 $('toggleServer').onclick = action(async () => {
   const running = lastStatus && lastStatus.running;
@@ -343,6 +356,22 @@ $('quit').onclick = action(async () => {
   await api('/api/quit', 'POST').catch(() => {});
   document.body.innerHTML = '<main><section class="card"><h2>PhotoSync Server has quit</h2>' +
     '<p class="muted">You can close this tab. Start the app again to resume backups.</p></section></main>';
+});
+
+// ---- FAQ collapse ----------------------------------------------------------
+document.querySelectorAll('.faq-item').forEach((item) => {
+  const q = item.querySelector('.faq-q');
+  const a = item.querySelector('.faq-a');
+  if (!q || !a) return;
+  a.style.display = 'none';
+  const base = q.textContent;
+  q.textContent = '▸  ' + base;
+  q.style.cursor = 'pointer';
+  q.onclick = () => {
+    const open = a.style.display !== 'none';
+    a.style.display = open ? 'none' : '';
+    q.textContent = (open ? '▸  ' : '▾  ') + base;
+  };
 });
 
 // ---- polling ---------------------------------------------------------------

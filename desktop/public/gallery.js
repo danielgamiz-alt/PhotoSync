@@ -520,6 +520,7 @@
   };
 
   $('retryLoad').onclick = () => loadMedia();
+  window.reloadGallery = () => loadMedia();
 
   // ---- polling -------------------------------------------------------------
   loadMedia();

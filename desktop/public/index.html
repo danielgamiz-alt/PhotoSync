@@ -63,7 +63,10 @@
       <div id="galleryBar" class="gallery-bar hidden">
         <span class="muted small">Showing</span>
         <select id="accountSelect" class="acct-select"></select>
+        <div class="gallery-bar-spacer"></div>
+        <button id="reindexBtn" class="btn btn-ghost btn-sm" title="Scan the storage folder for photos copied there manually">Scan for new files</button>
       </div>
+      <div id="scanNotice" class="scan-notice hidden"></div>
       <div id="galleryLoading" class="gallery-loading hidden">
         <div class="spinner"></div>
       </div>
@@ -157,11 +160,7 @@
           <div><div class="statnum" id="photoCount">—</div><div class="muted small">photos backed up</div></div>
           <div><div class="statnum" id="serverState">—</div><div class="muted small">status</div></div>
         </div>
-        <div class="btnrow">
-          <button id="toggleServer" class="btn">—</button>
-          <button id="reindexBtn" class="btn btn-ghost" title="Scan the storage folder for photos copied there manually">Scan for new files</button>
-          <span id="reindexHint" class="muted small"></span>
-        </div>
+        <div class="btnrow"><button id="toggleServer" class="btn">—</button></div>
       </div>
 
       <!-- Settings -->
