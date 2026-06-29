@@ -96,8 +96,10 @@
     <string name="server_gallery_title">Photos on server</string>
     <string name="server_gallery_empty">No photos stored on the server yet</string>
     <string name="server_gallery_error">Could not load photos: %1$s</string>
-    <string name="downloading">Downloading…</string>
-    <string name="download_complete">Saved to Pictures</string>
+    <string name="downloading">Saving to camera roll…</string>
+    <string name="download_complete">Saved to camera roll</string>
+    <string name="download_failed">Download failed: %1$s</string>
+    <string name="on_device">Already on this phone</string>
     <string name="download">Download to device</string>
     <string name="server_not_configured">Set up your server in Settings first</string>
 

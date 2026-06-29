@@ -55,6 +55,16 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Shown when the photo is already saved on this device. -->
+        <ImageView
+            android:id="@+id/viewerOnDevice"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:contentDescription="@string/on_device"
+            android:src="@drawable/ic_on_device"
+            android:visibility="gone" />
+
         <ImageButton
             android:id="@+id/viewerDownload"
             android:layout_width="48dp"

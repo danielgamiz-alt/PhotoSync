@@ -1,12 +1,14 @@
 package com.photosync.app
 
-import android.app.DownloadManager
-import android.content.Context
+import android.content.ContentValues
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.view.View
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +24,11 @@ import androidx.viewpager2.widget.ViewPager2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,8 +40,12 @@ import java.util.Locale
  * playback. The media list is handed over via [GalleryData] to avoid
  * serializing it through the Intent. No sharing or editing — view only.
  *
- * When [EXTRA_DOWNLOADABLE] is true (server gallery), a download button appears
- * in the top bar. It is hidden for items the user already has on the device.
+ * When [EXTRA_DOWNLOADABLE] is true (server gallery):
+ *  - Items NOT yet on this device show a download button.
+ *  - Items already on this device show a phone icon instead.
+ * Downloads go directly into DCIM/Camera via MediaStore so the photo
+ * appears in the camera roll and in PhotoSync's local gallery immediately
+ * after a pull-to-refresh.
  */
 @OptIn(UnstableApi::class)
 class PhotoViewerActivity : AppCompatActivity() {
@@ -43,6 +54,7 @@ class PhotoViewerActivity : AppCompatActivity() {
     private lateinit var topBar: View
     private lateinit var dateText: TextView
     private lateinit var nameText: TextView
+    private lateinit var onDeviceIcon: ImageView
     private lateinit var downloadButton: ImageButton
     private lateinit var adapter: ViewerPagerAdapter
     private var player: ExoPlayer? = null
@@ -72,6 +84,7 @@ class PhotoViewerActivity : AppCompatActivity() {
         topBar = findViewById(R.id.viewerTopBar)
         dateText = findViewById(R.id.viewerDate)
         nameText = findViewById(R.id.viewerName)
+        onDeviceIcon = findViewById(R.id.viewerOnDevice)
         downloadButton = findViewById(R.id.viewerDownload)
 
         findViewById<View>(R.id.viewerBack).setOnClickListener { finish() }
@@ -122,12 +135,14 @@ class PhotoViewerActivity : AppCompatActivity() {
 
     private fun updateDownloadButton(position: Int) {
         if (!downloadable) {
+            onDeviceIcon.visibility = View.GONE
             downloadButton.visibility = View.GONE
             return
         }
         val item = items.getOrNull(position) ?: return
         val hash = extractFileHash(item.uri.toString())
         val alreadyLocal = hash != null && hash in localHashes
+        onDeviceIcon.visibility = if (alreadyLocal) View.VISIBLE else View.GONE
         downloadButton.visibility = if (alreadyLocal) View.GONE else View.VISIBLE
     }
 
@@ -142,30 +157,89 @@ class PhotoViewerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Downloads the current server photo/video directly into DCIM/Camera via
+     * MediaStore (API 29+) or a direct file write with a media scanner trigger
+     * (API 26-28). Either way the photo appears in the camera roll and in
+     * PhotoSync's local gallery after a pull-to-refresh.
+     */
     private fun downloadCurrent() {
         val item = items.getOrNull(pager.currentItem) ?: return
-        val uriString = item.uri.toString()
-        if (!uriString.startsWith("http")) return
+        val urlString = item.uri.toString()
+        if (!urlString.startsWith("http")) return
+
         val prefs = SyncPrefs(this)
-        val request = DownloadManager.Request(Uri.parse(uriString)).apply {
-            setTitle(item.displayName)
-            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            // Save to DCIM/Camera so the photo appears in the camera roll and
-            // PhotoSync's own local gallery picks it up immediately.
-            setDestinationInExternalPublicDir(
-                Environment.DIRECTORY_DCIM,
-                "Camera/${item.displayName}",
+        Toast.makeText(this, R.string.downloading, Toast.LENGTH_SHORT).show()
+        downloadButton.visibility = View.GONE  // optimistic hide
+
+        lifecycleScope.launch {
+            try {
+                val hash = extractFileHash(urlString)
+                withContext(Dispatchers.IO) {
+                    val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                        if (prefs.apiKey.isNotEmpty()) setRequestProperty("x-api-key", prefs.apiKey)
+                        if (prefs.username.isNotEmpty()) setRequestProperty(
+                            "x-user", URLEncoder.encode(prefs.username, "UTF-8")
+                        )
+                        connectTimeout = 10_000
+                        readTimeout = 120_000
+                    }
+                    val mimeType = conn.contentType
+                        ?: if (item.isVideo) "video/mp4" else "image/jpeg"
+                    conn.inputStream.use { saveToGallery(item.displayName, mimeType, item.isVideo, it) }
+                }
+                // Update state so phone icon appears immediately for this item.
+                if (hash != null) localHashes = localHashes + hash
+                updateDownloadButton(pager.currentItem)
+                Toast.makeText(this@PhotoViewerActivity, R.string.download_complete, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                updateDownloadButton(pager.currentItem)  // restore button on failure
+                Toast.makeText(
+                    this@PhotoViewerActivity,
+                    getString(R.string.download_failed, e.message ?: "unknown error"),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    private fun saveToGallery(name: String, mimeType: String, isVideo: Boolean, input: InputStream) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val collection = if (isVideo)
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            else
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "DCIM/Camera")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = contentResolver.insert(collection, values)
+                ?: throw IOException("Could not create MediaStore entry")
+            try {
+                contentResolver.openOutputStream(uri)!!.use { out -> input.copyTo(out) }
+                values.clear()
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                contentResolver.update(uri, values, null, null)
+            } catch (e: Exception) {
+                contentResolver.delete(uri, null, null)
+                throw e
+            }
+        } else {
+            // API 26-28: write directly to DCIM/Camera and trigger media scan.
+            val dir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                "Camera"
             )
-            if (prefs.apiKey.isNotEmpty()) addRequestHeader("x-api-key", prefs.apiKey)
-            if (prefs.username.isNotEmpty()) addRequestHeader(
-                "x-user", URLEncoder.encode(prefs.username, "UTF-8")
+            dir.mkdirs()
+            val file = File(dir, name)
+            file.outputStream().use { out -> input.copyTo(out) }
+            android.media.MediaScannerConnection.scanFile(
+                this, arrayOf(file.absolutePath), arrayOf(mimeType), null
             )
         }
-        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        dm.enqueue(request)
-        Toast.makeText(this, R.string.downloading, Toast.LENGTH_SHORT).show()
-        // Optimistically hide the download button; the file is on its way.
-        downloadButton.visibility = View.GONE
     }
 
     override fun onStop() {
@@ -181,7 +255,7 @@ class PhotoViewerActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_INDEX = "index"
-        /** Pass true when viewing server photos to show the download button. */
+        /** Pass true when viewing server photos to show the download / on-device indicator. */
         const val EXTRA_DOWNLOADABLE = "downloadable"
 
         /** Extracts the 64-char hex hash from a server file URL, or null. */
