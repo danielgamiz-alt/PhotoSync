@@ -18,6 +18,7 @@ const { createTray } = require('./tray');
 const { pickFolder } = require('./folder-dialog');
 const { focusWindowByTitle } = require('./dashboard-window');
 const autostart = require('./autostart');
+const { promptAndCreate: promptShortcut } = require('./shortcut');
 
 const CONTROL_HOST = '127.0.0.1';
 const CONTROL_PORT = 8421;
@@ -144,6 +145,12 @@ async function main() {
     if (!autostartEnabled && (await autostart.enable())) autostartEnabled = true;
     prefs.autostartInitialized = true;
     savePrefs(prefs);
+  }
+
+  if (!prefs.shortcutPrompted) {
+    prefs.shortcutPrompted = true;
+    savePrefs(prefs);
+    promptShortcut(() => {}); // fire-and-forget; user's choice is self-contained
   }
 
   // "Last received" time for the status line: newest stored item, updated live.
