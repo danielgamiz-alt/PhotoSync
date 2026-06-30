@@ -148,19 +148,15 @@ jobs:
       - name: Name outputs after the tag
         shell: pwsh
         run: |
-          # Installer — versioned + stable-name copy
-          Copy-Item "desktop/dist/PhotoSync-Server-Setup-${{ steps.ver.outputs.name }}.exe" "PhotoSync-Server-Setup-${{ github.ref_name }}.exe"
+          # Installer — stable name only (version shown in the wizard UI)
           Copy-Item "desktop/dist/PhotoSync-Server-Setup-${{ steps.ver.outputs.name }}.exe" "PhotoSync-Server-Setup.exe"
-          # Zip — keep for users who prefer the portable build
+          # Zip — versioned so the downloaded file is self-describing
           Copy-Item "desktop/dist/PhotoSync Server-Windows.zip" "PhotoSync-Server-Windows-${{ github.ref_name }}.zip"
-          Copy-Item "desktop/dist/PhotoSync Server-Windows.zip" "PhotoSync-Server-Windows.zip"
 
       - name: Attach to the Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            PhotoSync-Server-Setup-${{ github.ref_name }}.exe
             PhotoSync-Server-Setup.exe
             PhotoSync-Server-Windows-${{ github.ref_name }}.zip
-            PhotoSync-Server-Windows.zip
           fail_on_unmatched_files: true
