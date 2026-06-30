@@ -22,8 +22,7 @@ node (Join-Path $desktop "assets\generate-icons.js") | Out-Null
 $exePath = Join-Path $dist "PhotoSync Server.exe"
 $iconPath = Join-Path $desktop "assets\app.ico"
 $srcPath = Join-Path $desktop "packaging\launcher.cs"
-& $csc /nologo /target:winexe "/out:$exePath" "/win32icon:$iconPath" `
-    /reference:System.Windows.Forms.dll "$srcPath"
+& $csc /nologo /target:winexe "/out:$exePath" "/win32icon:$iconPath" "$srcPath"
 if (-not (Test-Path $exePath)) { throw "launcher compile failed" }
 
 # 4. Bundle the Node runtime

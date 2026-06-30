@@ -1,14 +1,27 @@
 // Tiny launcher compiled into PhotoSync Server.exe. Double-clicking it starts the
 // bundled Node runtime on the app (which opens the dashboard, shows the tray
 // icon, and runs the backup server in the background) and then exits — Node
-// keeps running on its own. Built as a Windows app so no console flashes.
+// keeps running on its own. Built as /target:winexe so no console flashes.
+//
+// System.Windows.Forms is intentionally NOT referenced here — WinForms registers
+// a hidden message-pump window on startup which causes a brief white flash even
+// when no form is ever shown. P/Invoke MessageBox is used for errors instead.
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Windows.Forms;
+using System.Runtime.InteropServices;
 
 class Launcher
 {
+    // MB_OK | MB_ICONERROR
+    const uint MB_ICONERROR = 0x00000010;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = false)]
+    static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
+
+    static void Error(string text) =>
+        MessageBox(IntPtr.Zero, text, "PhotoSync Server", MB_ICONERROR);
+
     static void Main(string[] args)
     {
         string dir = AppDomain.CurrentDomain.BaseDirectory;
@@ -17,9 +30,7 @@ class Launcher
 
         if (!File.Exists(node) || !File.Exists(main))
         {
-            MessageBox.Show(
-                "PhotoSync Server files are missing. Please keep PhotoSync Server.exe inside its folder.",
-                "PhotoSync Server", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Error("PhotoSync Server files are missing. Please keep PhotoSync Server.exe inside its folder.");
             return;
         }
 
@@ -41,8 +52,7 @@ class Launcher
         }
         catch (Exception ex)
         {
-            MessageBox.Show("Could not start PhotoSync Server:\n" + ex.Message,
-                "PhotoSync Server", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Error("Could not start PhotoSync Server:\n" + ex.Message);
         }
     }
 }

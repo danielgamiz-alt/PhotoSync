@@ -22,6 +22,10 @@ function promptAndCreate(callback) {
   const target = launcherExe();
   if (!target) { callback(false); return; }
 
+  // Skip the prompt if the shortcut already exists (e.g. created by the installer).
+  const lnkCheck = path.join(os.homedir(), 'Desktop', 'PhotoSync Server.lnk');
+  if (fs.existsSync(lnkCheck)) { callback(false); return; }
+
   const lnk = path.join(os.homedir(), 'Desktop', 'PhotoSync Server.lnk');
   const vbs = path.join(os.tmpdir(), 'photosync-shortcut.vbs');
 

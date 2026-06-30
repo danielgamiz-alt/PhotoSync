@@ -116,8 +116,8 @@ jobs:
         working-directory: android
         run: rm -f photosync-release.jks keystore.properties
 
-  # The Windows server download: builds the portable folder (bundled Node +
-  # PhotoSync Server.exe launcher), zips it, and attaches it to the same Release.
+  # The Windows server download: builds the installer (.exe) and the portable
+  # zip, then attaches both to the same Release.
   # No secrets needed — the server isn't signed (users get a one-time
   # SmartScreen "Run anyway", same as the APK's Play Protect prompt).
   windows-server:
@@ -131,6 +131,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Inno Setup 6
+        run: choco install innosetup --yes --no-progress
+
       - name: Install desktop dependencies
         working-directory: desktop
         run: npm ci
@@ -138,22 +141,22 @@ jobs:
       - name: Stamp version from tag
         run: node scripts/stamp-version.js "${{ steps.ver.outputs.name }}"
 
-      - name: Build portable server (folder + zip)
+      - name: Build installer + portable zip
         working-directory: desktop
-        run: npm run package
+        run: npm run installer
 
-      - name: Name the zip after the tag
-        # Version-named + fixed-named copy, same as the APK, so the landing page
-        # can link straight to …/releases/latest/download/PhotoSync-Server-Windows.zip
+      - name: Name outputs after the tag
         shell: pwsh
         run: |
+          # Installer — stable name only (version shown in the wizard UI)
+          Copy-Item "desktop/dist/PhotoSync-Server-Setup-${{ steps.ver.outputs.name }}.exe" "PhotoSync-Server-Setup.exe"
+          # Zip — versioned so the downloaded file is self-describing
           Copy-Item "desktop/dist/PhotoSync Server-Windows.zip" "PhotoSync-Server-Windows-${{ github.ref_name }}.zip"
-          Copy-Item "desktop/dist/PhotoSync Server-Windows.zip" "PhotoSync-Server-Windows.zip"
 
       - name: Attach to the Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            PhotoSync-Server-Setup.exe
             PhotoSync-Server-Windows-${{ github.ref_name }}.zip
-            PhotoSync-Server-Windows.zip
           fail_on_unmatched_files: true

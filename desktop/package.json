@@ -9,6 +9,7 @@
     "sync-tokens": "node -e \"require('fs').copyFileSync('../docs/tokens.css','public/tokens.css')\"",
     "stamp-version": "node ../scripts/stamp-version.js",
     "package": "powershell -NoProfile -File build-portable.ps1",
+    "installer": "powershell -NoProfile -File build-installer.ps1",
     "test": "node test/control-test.js && node test/gallery-test.js && node test/single-instance-test.js"
   },
   "dependencies": {
