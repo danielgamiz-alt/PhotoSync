@@ -1,12 +1,13 @@
 {
   "name": "photoserver-desktop",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "description": "System-tray desktop app for PhotoSync Server (Windows): dashboard, background operation, auto-start, notifications.",
   "main": "src/main.js",
   "scripts": {
     "start": "node src/main.js",
     "build-icons": "node assets/generate-icons.js",
     "sync-tokens": "node -e \"require('fs').copyFileSync('../docs/tokens.css','public/tokens.css')\"",
+    "stamp-version": "node ../scripts/stamp-version.js",
     "package": "powershell -NoProfile -File build-portable.ps1",
     "test": "node test/control-test.js && node test/gallery-test.js && node test/single-instance-test.js"
   },

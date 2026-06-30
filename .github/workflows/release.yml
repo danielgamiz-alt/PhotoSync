@@ -135,17 +135,8 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Stamp server version from the tag
-        # The server's VERSION is hardcoded for local dev; bake the released
-        # version in so /api/health reports the truth (and a future "update your
-        # PC app" check can trust it).
-        shell: pwsh
-        run: |
-          $ver = "${{ github.ref_name }}" -replace '^v',''
-          $path = "server/src/server.js"
-          (Get-Content $path -Raw) -replace "const VERSION = '[^']*';", "const VERSION = '$ver';" |
-            Set-Content $path -NoNewline -Encoding utf8
-          Select-String -Path $path -Pattern "const VERSION"
+      - name: Stamp version from tag
+        run: node scripts/stamp-version.js "${{ steps.ver.outputs.name }}"
 
       - name: Build portable server (folder + zip)
         working-directory: desktop
