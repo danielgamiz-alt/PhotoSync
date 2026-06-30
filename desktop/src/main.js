@@ -135,6 +135,7 @@ async function main() {
   await trashStore.init(); // loads + purges items past the 30-day window
 
   let tray = null;
+  await autostart.migrate(); // rename old 'PhotoServer' registry key if present
   let autostartEnabled = await autostart.isEnabled();
 
   // First launch: turn on "start at login" automatically so a non-technical

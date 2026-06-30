@@ -41,6 +41,16 @@ function launchCommand() {
   return `wscript.exe "${vbs}"`;
 }
 
+// Renames the old 'PhotoServer' registry entry to 'PhotoSync Server' so
+// existing installs keep autostart after the rename without user action.
+async function migrate() {
+  const OLD = 'PhotoServer';
+  const { ok } = await run(['query', RUN_KEY, '/v', OLD]);
+  if (!ok) return; // nothing to migrate
+  await enable();                                    // write new key
+  await run(['delete', RUN_KEY, '/v', OLD, '/f']);   // remove old key
+}
+
 async function isEnabled() {
   const { ok } = await run(['query', RUN_KEY, '/v', VALUE_NAME]);
   return ok;
@@ -58,4 +68,4 @@ async function set(enabled) {
   return enabled ? enable() : disable();
 }
 
-module.exports = { isEnabled, enable, disable, set, launchCommand };
+module.exports = { isEnabled, enable, disable, set, launchCommand, migrate };
