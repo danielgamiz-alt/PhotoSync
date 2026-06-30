@@ -52,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutManager: GridLayoutManager
     private lateinit var swipe: SwipeRefreshLayout
     private lateinit var summaryText: TextView
+    private lateinit var summarySubtitle: TextView
     private lateinit var summaryProgress: ProgressBar
     private lateinit var emptyText: TextView
     private lateinit var datePill: TextView
@@ -130,6 +131,7 @@ class MainActivity : AppCompatActivity() {
         prefs = SyncPrefs(this)
 
         summaryText = findViewById(R.id.summaryText)
+        summarySubtitle = findViewById(R.id.summarySubtitle)
         summaryProgress = findViewById(R.id.summaryProgress)
         emptyText = findViewById(R.id.emptyText)
         swipe = findViewById(R.id.swipeRefresh)
@@ -529,8 +531,12 @@ class MainActivity : AppCompatActivity() {
                 val doneCount = entries.count { it.status == SyncStatus.DONE }
                 val total = entries.size
                 if (doneCount >= total) {
-                    // Everything is safe — headline number, no progress bar.
+                    // Everything is safe — headline number plus the green
+                    // "all safe on your PC" reassurance line, no progress bar.
                     summaryText.text = getString(R.string.backed_up_all, doneCount)
+                    summarySubtitle.text = getString(R.string.all_safe_on_pc)
+                    summarySubtitle.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.success))
+                    summarySubtitle.visibility = View.VISIBLE
                     summaryProgress.visibility = View.GONE
                     // The natural "tell a friend" moment (skip an empty library).
                     if (total > 0) maybeShowInviteCard()
@@ -541,17 +547,23 @@ class MainActivity : AppCompatActivity() {
                     // active upload already proves reachability, so we only
                     // probe when nothing is uploading.
                     summaryText.text = getString(R.string.server_unreachable_summary)
+                    summarySubtitle.visibility = View.GONE
                     summaryProgress.visibility = View.GONE
                 } else {
                     // Uploads still pending — name how many are left (the count
-                    // people actually want) and show progress against the total.
-                    summaryText.text = getString(R.string.backed_up_pending, doneCount, total - doneCount)
+                    // people actually want), reassure that it keeps going on
+                    // Wi‑Fi, and show progress against the total.
+                    summaryText.text = getString(R.string.backing_up_left, total - doneCount)
+                    summarySubtitle.text = getString(R.string.backup_continues_wifi)
+                    summarySubtitle.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    summarySubtitle.visibility = View.VISIBLE
                     summaryProgress.max = total
                     summaryProgress.progress = doneCount
                     summaryProgress.visibility = View.VISIBLE
                 }
             } else {
                 summaryText.text = getString(R.string.setup_not_backing_up)
+                summarySubtitle.visibility = View.GONE
                 summaryProgress.visibility = View.GONE
             }
         }

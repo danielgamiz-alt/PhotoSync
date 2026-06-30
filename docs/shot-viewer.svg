@@ -1,0 +1,53 @@
+<svg viewBox="0 0 300 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhotoSync full-screen photo viewer with a backed-up indicator">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#25c4de"/><stop offset="0.55" stop-color="#7c5cf0"/><stop offset="1" stop-color="#f2473f"/></linearGradient>
+    <linearGradient id="filmA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ec36a"/><stop offset="1" stop-color="#25c4de"/></linearGradient>
+    <linearGradient id="filmB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6c72e"/><stop offset="1" stop-color="#f7972e"/></linearGradient>
+    <clipPath id="screenV"><rect x="6" y="6" width="288" height="608" rx="34"/></clipPath>
+  </defs>
+
+  <rect x="2" y="2" width="296" height="616" rx="40" fill="#000"/>
+  <rect x="6" y="6" width="288" height="608" rx="34" fill="#000"/>
+
+  <g clip-path="url(#screenV)">
+    <text x="26" y="34" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">9:41</text>
+    <g fill="#fff"><rect x="246" y="24" width="14" height="9" rx="2"/><rect x="264" y="24" width="20" height="9" rx="2"/></g>
+
+    <!-- top bar -->
+    <path d="M26,58 l-10,8 l10,8" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="44" y="71" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="14" font-weight="600">June 21, 2026</text>
+
+    <!-- the photo -->
+    <rect x="6" y="120" width="288" height="300" fill="url(#sky)"/>
+    <!-- sun -->
+    <circle cx="220" cy="180" r="26" fill="#f6c72e" opacity="0.92"/>
+    <!-- horizon hills -->
+    <path d="M6,330 q60,-46 120,-10 q70,42 168,-8 l0,108 l-288,0 z" fill="#0f1012" opacity="0.45"/>
+    <path d="M6,360 q80,-30 150,4 q80,32 138,-2 l0,58 l-288,0 z" fill="#0f1012" opacity="0.7"/>
+
+    <!-- backed-up pill over photo -->
+    <g transform="translate(150,440)">
+      <rect x="-66" y="0" width="132" height="28" rx="14" fill="#0f1012" opacity="0.85"/>
+      <g transform="translate(-50,14)"><circle r="7" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <text x="-36" y="18" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Backed up to PC</text>
+    </g>
+
+    <!-- filmstrip -->
+    <g>
+      <rect x="6" y="486" width="60" height="60" rx="6" fill="url(#filmB)" opacity="0.6"/>
+      <rect x="76" y="480" width="72" height="72" rx="8" fill="url(#sky)" stroke="#fff" stroke-width="2"/>
+      <rect x="158" y="486" width="60" height="60" rx="6" fill="url(#filmA)" opacity="0.6"/>
+      <rect x="228" y="486" width="60" height="60" rx="6" fill="#1a1c20"/>
+    </g>
+
+    <!-- bottom actions -->
+    <g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- share -->
+      <g transform="translate(60,584)"><circle cx="-8" cy="0" r="3"/><circle cx="8" cy="-7" r="3"/><circle cx="8" cy="7" r="3"/><path d="M-5,-1.5 L5,-5.5 M-5,1.5 L5,5.5"/></g>
+      <!-- download -->
+      <g transform="translate(150,584)"><path d="M0,-8 L0,4 M-5,-1 L0,4 L5,-1 M-8,8 L8,8"/></g>
+      <!-- delete -->
+      <g transform="translate(240,584)"><path d="M-7,-4 L7,-4 M-5,-4 L-5,8 L5,8 L5,-4 M-3,-4 L-3,-7 L3,-7 L3,-4"/></g>
+    </g>
+  </g>
+</svg>

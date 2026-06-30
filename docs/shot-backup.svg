@@ -1,0 +1,77 @@
+<svg viewBox="0 0 300 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhotoSync backing up in the background — progress bar and per-photo upload badges">
+  <defs>
+    <linearGradient id="b1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6c72e"/><stop offset="1" stop-color="#f2473f"/></linearGradient>
+    <linearGradient id="b2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#25c4de"/><stop offset="1" stop-color="#7c5cf0"/></linearGradient>
+    <linearGradient id="b3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ec36a"/><stop offset="1" stop-color="#25c4de"/></linearGradient>
+    <linearGradient id="b4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cf0"/><stop offset="1" stop-color="#f2473f"/></linearGradient>
+    <linearGradient id="b5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7972e"/><stop offset="1" stop-color="#f6c72e"/></linearGradient>
+    <linearGradient id="b6" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2473f"/><stop offset="1" stop-color="#7c5cf0"/></linearGradient>
+    <linearGradient id="b7" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ec36a"/><stop offset="1" stop-color="#f6c72e"/></linearGradient>
+    <linearGradient id="b8" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#25c4de"/><stop offset="1" stop-color="#2ec36a"/></linearGradient>
+    <linearGradient id="b9" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cf0"/><stop offset="1" stop-color="#25c4de"/></linearGradient>
+    <clipPath id="screenB"><rect x="6" y="6" width="288" height="608" rx="34"/></clipPath>
+  </defs>
+
+  <rect x="2" y="2" width="296" height="616" rx="40" fill="#000"/>
+  <rect x="6" y="6" width="288" height="608" rx="34" fill="#0f1012"/>
+
+  <g clip-path="url(#screenB)">
+    <text x="26" y="34" fill="#ecedef" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">9:41</text>
+    <g fill="#ecedef"><rect x="246" y="24" width="14" height="9" rx="2"/><rect x="264" y="24" width="20" height="9" rx="2"/></g>
+
+    <g transform="translate(24,52) scale(0.26)">
+      <path fill="#f2473f" d="M48,43.608 L38,26.288 A32,32 0 0 1 70,26.288 L60,43.608 Z"/>
+      <path fill="#f7972e" d="M60,43.608 L70,26.288 A32,32 0 0 1 86,54 L66,54 Z"/>
+      <path fill="#f6c72e" d="M66,54 L86,54 A32,32 0 0 1 70,81.712 L60,64.392 Z"/>
+      <path fill="#2ec36a" d="M60,64.392 L70,81.712 A32,32 0 0 1 38,81.712 L48,64.392 Z"/>
+      <path fill="#25c4de" d="M48,64.392 L38,81.712 A32,32 0 0 1 22,54 L42,54 Z"/>
+      <path fill="#7c5cf0" d="M42,54 L22,54 A32,32 0 0 1 38,26.288 L48,43.608 Z"/>
+    </g>
+    <text x="52" y="71" fill="#ecedef" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700">PhotoSync</text>
+
+    <!-- summary with progress -->
+    <text x="20" y="104" fill="#ecedef" font-family="Segoe UI, system-ui, sans-serif" font-size="15" font-weight="700">Backing up — 36 left</text>
+    <rect x="20" y="114" width="260" height="4" rx="2" fill="#2e323a"/>
+    <rect x="20" y="114" width="208" height="4" rx="2" fill="#7c5cf0"/>
+    <text x="20" y="136" fill="#a7abb3" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="500">Continues on Wi-Fi · no need to keep the app open</text>
+
+    <text x="20" y="162" fill="#ecedef" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="700">Today</text>
+
+    <g>
+      <rect x="8"   y="172" width="90" height="90" rx="4" fill="url(#b1)"/>
+      <rect x="102" y="172" width="90" height="90" rx="4" fill="url(#b2)"/>
+      <rect x="196" y="172" width="90" height="90" rx="4" fill="url(#b3)"/>
+      <rect x="8"   y="266" width="90" height="90" rx="4" fill="url(#b4)"/>
+      <rect x="102" y="266" width="90" height="90" rx="4" fill="url(#b5)"/>
+      <rect x="196" y="266" width="90" height="90" rx="4" fill="url(#b6)"/>
+      <rect x="8"   y="360" width="90" height="90" rx="4" fill="url(#b7)"/>
+      <rect x="102" y="360" width="90" height="90" rx="4" fill="url(#b8)"/>
+      <rect x="196" y="360" width="90" height="90" rx="4" fill="url(#b9)"/>
+    </g>
+
+    <!-- badges: first row uploading (spinner arc), rest done -->
+    <g>
+      <!-- uploading badges -->
+      <g transform="translate(84,176)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#7c5cf0"/><path d="M0,-4 A4,4 0 1 1 -4,0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
+      <g transform="translate(178,176)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#7c5cf0"/><path d="M0,-4 A4,4 0 1 1 -4,0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
+      <g transform="translate(272,176)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#7c5cf0"/><path d="M0,-4 A4,4 0 1 1 -4,0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
+      <!-- done badges -->
+      <g transform="translate(84,270)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g transform="translate(178,270)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g transform="translate(272,270)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g transform="translate(84,364)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g transform="translate(178,364)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g transform="translate(272,364)"><circle r="8" fill="#0f1012" opacity="0.55"/><circle r="6.5" fill="#2ec36a"/><path d="M-3,0 L-1,2 L3,-2.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </g>
+
+    <!-- video duration chip example -->
+    <g transform="translate(150,438)"><rect x="0" y="0" width="34" height="15" rx="7" fill="#000" opacity="0.6"/><text x="17" y="11" text-anchor="middle" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">0:12</text></g>
+
+    <g transform="translate(94,576)">
+      <rect x="0" y="0" width="112" height="34" rx="17" fill="#1a1c20" stroke="#2e323a"/>
+      <rect x="4" y="4" width="58" height="26" rx="13" fill="#7c5cf0"/>
+      <text x="33" y="21" text-anchor="middle" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700">Photos</text>
+      <text x="86" y="21" text-anchor="middle" fill="#a7abb3" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700">Videos</text>
+    </g>
+  </g>
+</svg>

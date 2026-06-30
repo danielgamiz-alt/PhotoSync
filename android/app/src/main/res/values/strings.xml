@@ -58,6 +58,9 @@
     <string name="setup_computer_expand">Set up the computer ▾</string>
     <string name="backed_up_pending">%1$d backed up · %2$d waiting</string>
     <string name="backed_up_all">%1$d photos backed up</string>
+    <string name="all_safe_on_pc">✓ All safe on your PC</string>
+    <string name="backing_up_left">Backing up — %1$d left</string>
+    <string name="backup_continues_wifi">Continues on Wi‑Fi · no need to keep the app open</string>
     <string name="gallery_empty">No photos found on this device</string>
 
     <!-- First-run setup: persistent CTA + checklist card shown until the
@@ -114,6 +117,13 @@
     <string name="selection_count">%1$d selected</string>
     <string name="action_trash">Trash</string>
     <string name="action_delete_device">Delete from device</string>
+    <!-- Viewer bottom action bar -->
+    <string name="action_share">Share</string>
+    <string name="action_delete_local">Delete locally</string>
+    <string name="action_delete_everywhere">Delete</string>
+    <string name="share_photo">Share photo</string>
+    <string name="share_chooser">Share via</string>
+    <string name="backed_up_to_pc">Backed up to PC</string>
     <string name="delete_from_device">Delete from device</string>
     <string name="delete_everywhere">Delete everywhere</string>
     <string name="delete_device_confirm_title">Delete from device?</string>
