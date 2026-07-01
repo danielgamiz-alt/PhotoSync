@@ -14,7 +14,7 @@ AppPublisherURL=https://danielgamiz-alt.github.io/PhotoSync/
 AppSupportURL=https://github.com/danielgamiz-alt/PhotoSync
 AppUpdatesURL=https://github.com/danielgamiz-alt/PhotoSync/releases
 
-; Install to %LocalAppData%\PhotoSync Server — no admin prompt needed.
+; Install to %LocalAppData%\PhotoSync Server - no admin prompt needed.
 DefaultDirName={localappdata}\PhotoSync Server
 DisableDirPage=yes
 
@@ -35,7 +35,7 @@ UninstallDisplayName=PhotoSync Server
 Compression=lzma2/ultra64
 SolidCompression=yes
 
-; No admin — per-user install.
+; No admin - per-user install.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=
 
@@ -53,7 +53,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
-; The portable build produces dist\PhotoSync Server\ — copy everything from there.
+; The portable build produces dist\PhotoSync Server\ - copy everything from there.
 Source: "dist\PhotoSync Server\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

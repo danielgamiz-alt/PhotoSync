@@ -1,9 +1,9 @@
 // Tiny launcher compiled into PhotoSync Server.exe. Double-clicking it starts the
 // bundled Node runtime on the app (which opens the dashboard, shows the tray
-// icon, and runs the backup server in the background) and then exits — Node
+// icon, and runs the backup server in the background) and then exits - Node
 // keeps running on its own. Built as /target:winexe so no console flashes.
 //
-// System.Windows.Forms is intentionally NOT referenced here — WinForms registers
+// System.Windows.Forms is intentionally NOT referenced here - WinForms registers
 // a hidden message-pump window on startup which causes a brief white flash even
 // when no form is ever shown. P/Invoke MessageBox is used for errors instead.
 using System;
@@ -19,8 +19,10 @@ class Launcher
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = false)]
     static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 
-    static void Error(string text) =>
+    static void Error(string text)
+    {
         MessageBox(IntPtr.Zero, text, "PhotoSync Server", MB_ICONERROR);
+    }
 
     static void Main(string[] args)
     {
