@@ -212,27 +212,56 @@
   // up and the tiles closest to the viewport load first.
   const MAX_THUMB_INFLIGHT = 6;
   let thumbInflight = 0;
-  const thumbQueue = []; // [{img, src, handler}]
+  const thumbQueue = []; // images waiting for a slot (each carries _thumbSrc)
   function drainThumbQueue() {
     while (thumbInflight < MAX_THUMB_INFLIGHT && thumbQueue.length > 0) {
-      const { img, src, handler } = thumbQueue.shift();
-      // Skip if the tile was scrolled out of view before its turn came.
-      if (img.dataset.src !== src) continue;
-      thumbInflight++;
-      img.addEventListener('load', handler);
-      img.addEventListener('error', handler);
-      img.setAttribute('src', src);
+      const img = thumbQueue.shift();
+      img._thumbQueued = false;
+      if (img._releaseThumb) continue; // already loading (stale duplicate entry)
+      // Skip if the tile was scrolled out of view before its turn came, or the
+      // real thumb is already showing.
+      if (img.dataset.src !== img._thumbSrc) continue;
+      if (img.getAttribute('src') === img._thumbSrc) continue;
+      startThumbLoad(img);
     }
   }
-  function enqueueThumb(img, src, onDone) {
-    const handler = () => {
+  // Load one image while holding a concurrency slot. The slot is released
+  // exactly once — on load, on error, OR when the tile is unloaded mid-flight
+  // (via _releaseThumb, see unloadTileMedia). That last case is essential:
+  // clearing an <img>'s src to abort an in-flight request does NOT reliably
+  // fire load/error, so without an explicit release a fast scroll would leak
+  // slots until thumbInflight saturates and the queue jams for good.
+  function startThumbLoad(img) {
+    const src = img._thumbSrc;
+    thumbInflight++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      img._releaseThumb = null;
+      img.removeEventListener('load', onSettle);
+      img.removeEventListener('error', onSettle);
       thumbInflight--;
-      img.removeEventListener('load', handler);
-      img.removeEventListener('error', handler);
       drainThumbQueue();
-      onDone();
     };
-    thumbQueue.push({ img, src, handler });
+    const onSettle = () => {
+      const ok = img.getAttribute('src') === src && img.complete && img.naturalWidth > 0;
+      release();
+      if (ok) {
+        img.classList.remove('thumb-blur');
+        img.classList.add('thumb-loaded');
+      }
+    };
+    img._releaseThumb = release;
+    img.addEventListener('load', onSettle);
+    img.addEventListener('error', onSettle);
+    img.setAttribute('src', src);
+  }
+  function enqueueThumb(img, src) {
+    if (img._thumbQueued || img._releaseThumb) return; // already waiting/loading
+    img._thumbSrc = src;
+    img._thumbQueued = true;
+    thumbQueue.push(img);
     drainThumbQueue();
   }
   let tileObserver = null;
@@ -244,15 +273,7 @@
       el.setAttribute('src', src);
       return;
     }
-    // For images: queue the real thumb request, then clear the blur class on load.
-    const img = el;
-    const onLoad = () => {
-      if (img.getAttribute('src') === src) {
-        img.classList.remove('thumb-blur');
-        img.classList.add('thumb-loaded');
-      }
-    };
-    enqueueThumb(img, src, onLoad);
+    enqueueThumb(el, src);
   }
   function unloadTileMedia(el) {
     const blurSrc = el.dataset.blur;
@@ -263,6 +284,10 @@
       el.load(); // abort any in-flight metadata fetch and free the decoded frame
       return;
     }
+    // Give back the concurrency slot if this tile was still loading — the abort
+    // below won't reliably fire load/error, so we must release it ourselves.
+    el._thumbQueued = false;
+    if (el._releaseThumb) el._releaseThumb();
     // Restore blur placeholder if one exists, otherwise clear src.
     el.classList.remove('thumb-loaded');
     if (blurSrc) {
