@@ -23,6 +23,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.ver.outputs.name }}     # version (tag without the leading "v"), consumed by the windows-server job
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,7 +141,7 @@ jobs:
         run: npm ci
 
       - name: Stamp version from tag
-        run: node scripts/stamp-version.js "${{ steps.ver.outputs.name }}"
+        run: node scripts/stamp-version.js "${{ needs.build.outputs.name }}"
 
       - name: Build installer + portable zip
         working-directory: desktop
@@ -149,7 +151,7 @@ jobs:
         shell: pwsh
         run: |
           # Installer — stable name only (version shown in the wizard UI)
-          Copy-Item "desktop/dist/PhotoSync-Server-Setup-${{ steps.ver.outputs.name }}.exe" "PhotoSync-Server-Setup.exe"
+          Copy-Item "desktop/dist/PhotoSync-Server-Setup-${{ needs.build.outputs.name }}.exe" "PhotoSync-Server-Setup.exe"
           # Zip — versioned so the downloaded file is self-describing
           Copy-Item "desktop/dist/PhotoSync Server-Windows.zip" "PhotoSync-Server-Windows-${{ github.ref_name }}.zip"
 
