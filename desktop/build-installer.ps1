@@ -1,16 +1,16 @@
 # Builds the PhotoSync Server Windows installer (.exe).
-# Requires Inno Setup 6 — iscc.exe must be on PATH or in the default install dir.
+# Requires Inno Setup 6 - iscc.exe must be on PATH or in the default install dir.
 # Usage: npm run installer   (from the desktop folder)
 
 $ErrorActionPreference = "Stop"
 $desktop = $PSScriptRoot
 
-# ── 1. Build the portable folder (same content the zip uses) ──────────────────
-Write-Host "Step 1/2 — building portable folder..." -ForegroundColor Cyan
+# -- 1. Build the portable folder (same content the zip uses) ---
+Write-Host "Step 1/2 - building portable folder..." -ForegroundColor Cyan
 & powershell -NoProfile -File (Join-Path $desktop "build-portable.ps1")
 
-# ── 2. Compile the installer ──────────────────────────────────────────────────
-Write-Host "Step 2/2 — compiling installer..." -ForegroundColor Cyan
+# -- 2. Compile the installer ---
+Write-Host "Step 2/2 - compiling installer..." -ForegroundColor Cyan
 
 # Read the version from desktop/package.json so stamp-version keeps everything in sync.
 $pkg = Get-Content (Join-Path $desktop "package.json") -Raw | ConvertFrom-Json

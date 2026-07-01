@@ -49,7 +49,7 @@ Copy-Item (Join-Path $desktop "node_modules") $nodeModulesDst -Recurse
 
 # 5b. Drop platform binaries this Windows build can never use. systray2 and
 # node-notifier ship helper binaries for macOS and Linux alongside the Windows
-# ones; only the Windows ones run here. Pruned from the dist copy only — the
+# ones; only the Windows ones run here. Pruned from the dist copy only - the
 # dev node_modules is left intact. (sharp is already Windows-only via npm.)
 $prune = @(
     "systray2\traybin\tray_darwin_release",
@@ -86,7 +86,7 @@ To quit or change settings, use the green icon by the clock.
 $size = [math]::Round((Get-ChildItem $dist -Recurse | Measure-Object Length -Sum).Sum / 1MB, 0)
 Write-Host "Done -> $dist  (${size} MB)" -ForegroundColor Green
 
-# 8. Zip it up — a single file to hand to family (extract, double-click).
+# 8. Zip it up - a single file to hand to family (extract, double-click).
 #    The archive contains a top-level PhotoSync Server\ folder so extraction is tidy.
 $zip = Join-Path (Split-Path $dist -Parent) "PhotoSync Server-Windows.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
