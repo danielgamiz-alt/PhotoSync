@@ -16,6 +16,9 @@ try {
 const THUMB_DIR = '.thumbs';
 const THUMB_SIZE = 400;
 const BLUR_SIZE = 12;
+// Longest edge for the full-screen viewer's web-safe copy of a non-web format.
+// Big enough to look sharp on a large monitor without shipping a 40MP original.
+const DISPLAY_SIZE = 2560;
 const WARM_CONCURRENCY = 3;
 
 class Thumbnailer {
@@ -38,6 +41,34 @@ class Thumbnailer {
 
   _blurPath(hash) {
     return path.join(this.getRoot(), THUMB_DIR, `${hash}-b.jpg`);
+  }
+
+  _displayPath(hash) {
+    return path.join(this.getRoot(), THUMB_DIR, `${hash}-view.jpg`);
+  }
+
+  /**
+   * Returns a path to a full-size, browser-displayable JPEG for image formats
+   * the browser can't render natively (HEIC/HEIF/TIFF/BMP…), generating it on
+   * first request and caching it beside the thumbnails. Returns null when a
+   * conversion isn't possible (no sharp, a video, or a decode failure) so the
+   * caller can fall back to serving the original bytes.
+   */
+  async display(hash, absSource, type) {
+    if (!sharp || type === 'video') return null;
+    const out = this._displayPath(hash);
+    try {
+      if (fs.existsSync(out)) return out;
+      await fsp.mkdir(path.dirname(out), { recursive: true });
+      await sharp(absSource)
+        .rotate() // honour EXIF orientation
+        .resize(DISPLAY_SIZE, DISPLAY_SIZE, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82 })
+        .toFile(out);
+      return out;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -125,6 +156,7 @@ class Thumbnailer {
     this._blurCache.delete(hash);
     await fsp.unlink(this._thumbPath(hash)).catch(() => {});
     await fsp.unlink(this._blurPath(hash)).catch(() => {});
+    await fsp.unlink(this._displayPath(hash)).catch(() => {});
   }
 }
 
@@ -150,4 +182,11 @@ function mimeFor(name) {
   return MIME[path.extname(name).toLowerCase()] || 'application/octet-stream';
 }
 
-module.exports = { Thumbnailer, mimeFor, THUMB_DIR };
+// Image formats browsers render natively in an <img>. Anything else (HEIC,
+// HEIF, TIFF, BMP…) needs converting before the full-screen viewer can show it.
+const WEB_SAFE_IMAGE = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+function isWebSafeImage(name) {
+  return WEB_SAFE_IMAGE.has(path.extname(name).toLowerCase());
+}
+
+module.exports = { Thumbnailer, mimeFor, isWebSafeImage, THUMB_DIR };
