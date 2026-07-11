@@ -431,7 +431,7 @@
     $('lbStage').innerHTML =
       m.type === 'video'
         ? `<video src="/media/file?hash=${m.hash}" controls autoplay></video>`
-        : `<img src="/media/file?hash=${m.hash}" alt="">`;
+        : `<img src="/media/view?hash=${m.hash}" alt="">`;
   }
   function navLightbox(delta) {
     const n = media.length;

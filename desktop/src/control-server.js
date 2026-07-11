@@ -4,7 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const { mimeFor } = require('./gallery-store');
+const { mimeFor, isWebSafeImage } = require('./gallery-store');
 
 // The private dashboard. Bound to 127.0.0.1 ONLY — it can change the storage
 // folder, API key, autostart, etc., so it must never be reachable from the LAN
@@ -96,6 +96,23 @@ async function route(req, res, deps) {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });
     return serveFile(req, res, entry.abs, mimeFor(entry.path));
+  }
+
+  // Full-screen viewer source. Web-native images (and videos) stream straight
+  // from disk at full quality; formats the browser can't decode (HEIC/TIFF/
+  // BMP…) are converted to a large JPEG so old libraries still open — without
+  // this the lightbox showed "not supported" for those. Falls back to the
+  // original bytes if conversion isn't possible (e.g. sharp missing).
+  if (p === '/media/view' && req.method === 'GET') {
+    const entry = entryFor(deps, url.searchParams.get('hash'));
+    if (!entry) return sendJson(res, 404, { error: 'not found' });
+    const mime = mimeFor(entry.path);
+    if (mime.startsWith('video') || isWebSafeImage(entry.path)) {
+      return serveFile(req, res, entry.abs, mime);
+    }
+    const jpeg = await deps.thumbnailer.display(entry.hash, entry.abs, 'image');
+    if (jpeg) return serveFile(req, res, jpeg, 'image/jpeg');
+    return serveFile(req, res, entry.abs, mime);
   }
 
   if (p === '/api/media/reveal' && req.method === 'POST') {

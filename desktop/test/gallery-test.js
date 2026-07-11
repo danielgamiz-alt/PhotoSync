@@ -152,6 +152,39 @@ async function main() {
     const thumbRes = await fetch(`${BASE}/media/thumb?hash=${h1}`);
     check('thumb: 200', thumbRes.status === 200);
 
+    // ---- full-screen viewer source (/media/view) -------------------------
+    // Web-native images stream through untouched, at full quality.
+    const viewPng = await fetch(`${BASE}/media/view?hash=${h1}`);
+    check('view: web-safe image → 200', viewPng.status === 200, `got ${viewPng.status}`);
+    check('view: web-safe served as original type', viewPng.headers.get('content-type') === 'image/png',
+      viewPng.headers.get('content-type'));
+    const viewPngBytes = Buffer.from(await viewPng.arrayBuffer());
+    check('view: web-safe bytes are the untouched original',
+      viewPngBytes.equals(Buffer.concat([PNG_1x1, Buffer.from('1')])));
+
+    // A format the browser can't render (TIFF) is converted to JPEG so the
+    // lightbox can display it — the bug this endpoint fixes.
+    let sharpOk = true;
+    try { require('sharp'); } catch { sharpOk = false; }
+    if (sharpOk) {
+      const sharp = require('sharp');
+      const tiff = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 9, g: 40, b: 90 } } })
+        .tiff().toBuffer();
+      const { Readable } = require('stream');
+      const tiffHash = (await storage.store(Readable.from(tiff), { filename: 'heirloom.tiff', takenAt: 0 })).hash;
+      const viewTiff = await fetch(`${BASE}/media/view?hash=${tiffHash}`);
+      check('view: non-web image → 200', viewTiff.status === 200, `got ${viewTiff.status}`);
+      check('view: non-web image converted to jpeg',
+        viewTiff.headers.get('content-type') === 'image/jpeg', viewTiff.headers.get('content-type'));
+      check('view: converted copy is cached on disk',
+        fs.existsSync(path.join(dir, '.thumbs', `${tiffHash}-view.jpg`)));
+      // Drop the throwaway TIFF so later count assertions see the original 3.
+      await storage.remove(tiffHash);
+      await thumbnailer.forget(tiffHash);
+    } else {
+      console.log('  skip view: non-web conversion (sharp not installed)');
+    }
+
     // missing hash
     const missing = await fetch(`${BASE}/media/file?hash=deadbeef`);
     check('file: missing → 404', missing.status === 404);
