@@ -61,6 +61,23 @@
         : { day: 'numeric', month: 'short', year: 'numeric' }
     );
   }
+  // Section grouping respects how confident we are about a photo's date:
+  //   exact → its own day        ("Yesterday", "4 Mar")
+  //   year  → one section per year, dateless ("2025 · Undated") — for photos
+  //           the owner filed under a bare YYYY/ folder with no real metadata
+  //   none  → a single "Undated" section at the bottom
+  function groupKey(m) {
+    const p = m.datePrecision || 'exact';
+    if (p === 'exact' && m.takenAt) return 'd-' + dayKey(m.takenAt);
+    if (p === 'year' && m.takenAt) return 'y-' + new Date(m.takenAt).getFullYear();
+    return 'undated';
+  }
+  function groupLabel(m) {
+    const p = m.datePrecision || 'exact';
+    if (p === 'exact' && m.takenAt) return dayLabel(m.takenAt);
+    if (p === 'year' && m.takenAt) return new Date(m.takenAt).getFullYear() + ' · Undated';
+    return 'Undated';
+  }
   const escapeHtml = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -153,9 +170,9 @@
     const groups = [];
     let cur = null;
     media.forEach((m, i) => {
-      const k = dayKey(m.takenAt);
+      const k = groupKey(m);
       if (!cur || cur.key !== k) {
-        cur = { key: k, label: dayLabel(m.takenAt), items: [] };
+        cur = { key: k, label: groupLabel(m), items: [] };
         groups.push(cur);
       }
       cur.items.push(i);
