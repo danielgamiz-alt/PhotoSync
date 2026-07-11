@@ -227,13 +227,16 @@ $('reindexBtn').onclick = async () => {
   $('reindexBtn').textContent = 'Scanning…';
   try {
     const res = await api('/api/reindex', 'POST');
+    // Mention skipped files so a scan that finds nothing usable is never silent
+    // about why (e.g. a folder of PDFs or other non-photo files).
+    const skipNote = res.skipped > 0 ? ` (${res.skipped} unsupported skipped)` : '';
     if (res.added > 0) {
       const n = res.added;
-      showScanNotice(`${n} new ${n === 1 ? 'item' : 'items'} found and synced`);
+      showScanNotice(`${n} new ${n === 1 ? 'item' : 'items'} found and synced${skipNote}`);
       render(await api('/api/status'));
       if (window.reloadGallery) window.reloadGallery();
     } else {
-      showScanNotice('No new files found', true);
+      showScanNotice('No new files found' + skipNote, true);
     }
   } catch (e) {
     showScanNotice(e.message || 'Scan failed', true);

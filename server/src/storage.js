@@ -132,9 +132,19 @@ class Storage {
     }
 
     const relPath = await this._fileAway(tmpPath, filename, takenAt, user);
-    const takenAtMs = takenAt && takenAt > 0 ? takenAt : Date.now();
+    const hasDate = takenAt && takenAt > 0;
+    const takenAtMs = hasDate ? takenAt : Date.now();
     if (!this.index[hash]) this.index[hash] = {};
-    this.index[hash][user] = { path: relPath, size, storedAt: Date.now(), takenAt: takenAtMs };
+    this.index[hash][user] = {
+      path: relPath,
+      size,
+      storedAt: Date.now(),
+      takenAt: takenAtMs,
+      // Uploads that carried a real capture time are dated exactly; ones without
+      // are filed under today's folder only so they don't vanish — mark them
+      // undated so the gallery doesn't present a made-up date as fact.
+      datePrecision: hasDate ? 'exact' : 'none',
+    };
     await this.saveIndex();
     return { stored: true, path: relPath, hash };
   }
@@ -161,14 +171,21 @@ class Storage {
     const out = [];
     for (const [hash, byUser] of Object.entries(this.index)) {
       for (const [user, e] of Object.entries(byUser)) {
+        // Files stored before precision was tracked are all date-organized,
+        // so treat a missing value as an exact date.
+        const datePrecision = e.datePrecision || 'exact';
+        // Undated items sort to the bottom (takenAt 0); everything else keeps
+        // its capture date, falling back to the store time for old entries.
+        const takenAt = datePrecision === 'none' ? 0 : (e.takenAt || e.storedAt || 0);
         out.push({
           hash,
           user,
           path: e.path,
           name: e.path.split('/').pop(),
           size: e.size,
-          takenAt: e.takenAt || e.storedAt || 0,
+          takenAt,
           storedAt: e.storedAt || 0,
+          datePrecision,
           type: isVideoName(e.path) ? 'video' : 'image',
         });
       }
@@ -205,10 +222,17 @@ class Storage {
   /**
    * Scans the storage folder for image/video files not yet in the index,
    * hashes each one, infers the owner and capture date from the path
-   * structure (username/YYYY/MM/ or YYYY/MM/ for the default user), and
-   * adds them. Safe to call repeatedly — already-indexed files are skipped.
+   * structure, and adds them. Safe to call repeatedly — already-indexed files
+   * are skipped.
    *
-   * Returns { added, total } where total is the new index size.
+   * Unlike the uploader, this accepts folders the customer arranged
+   * themselves: a bare `YYYY/` folder (month unknown), or any other folder
+   * (no date at all) is still imported rather than ignored — see
+   * inferFromPath for how the capture date and its precision are derived.
+   *
+   * Returns { added, skipped, total }: added = files newly indexed,
+   * skipped = files passed over as unsupported (not an image/video),
+   * total = the new index size.
    */
   async reindex() {
     // Collect paths and hashes already known so we can skip them fast.
@@ -218,6 +242,7 @@ class Storage {
     }
 
     let added = 0;
+    let skipped = 0;
     const scan = async (dir) => {
       let entries;
       try { entries = await fsp.readdir(dir, { withFileTypes: true }); }
@@ -234,25 +259,26 @@ class Storage {
         } else if (entry.isFile()) {
           const relPath = path.relative(this.root, abs).split(path.sep).join('/');
           if (knownPaths.has(relPath)) continue;
-          if (!isImageName(relPath) && !isVideoName(relPath)) continue;
+          if (!isImageName(relPath) && !isVideoName(relPath)) {
+            skipped++;
+            continue;
+          }
 
-          const parsed = parseStoragePath(relPath);
-          if (!parsed) continue;
+          const info = inferFromPath(relPath);
 
-          // Skip if this user already has an index entry at a different path
-          // for the same content (detect via hash after the path check).
           const stat = await fsp.stat(abs).catch(() => null);
           if (!stat) continue;
           const hash = await hashFile(abs);
 
           if (!this.index[hash]) this.index[hash] = {};
-          if (this.index[hash][parsed.user]) continue; // already indexed for this user
+          if (this.index[hash][info.user]) continue; // already indexed for this user
 
-          this.index[hash][parsed.user] = {
+          this.index[hash][info.user] = {
             path: relPath,
             size: stat.size,
             storedAt: stat.mtimeMs,
-            takenAt: parsed.takenAt,
+            takenAt: info.takenAt,
+            datePrecision: info.datePrecision,
           };
           knownPaths.add(relPath);
           added++;
@@ -262,7 +288,7 @@ class Storage {
 
     await scan(this.root);
     if (added > 0) await this.saveIndex();
-    return { added, total: this.count() };
+    return { added, skipped, total: this.count() };
   }
 
   /**
@@ -303,26 +329,50 @@ function isImageName(name) {
   return IMAGE_EXTS.has(path.extname(name).toLowerCase());
 }
 
+// A folder named like a year only counts as one if it's actually plausible —
+// four digits between 1900 and next year — so a file called "2099abc" or a
+// stray "0007" folder isn't mistaken for a capture year.
+function plausibleYear(segment) {
+  if (!/^\d{4}$/.test(segment)) return null;
+  const y = parseInt(segment, 10);
+  return y >= 1900 && y <= new Date().getFullYear() + 1 ? y : null;
+}
+
 /**
- * Parses a relative storage path into { user, takenAt }.
- * Supports two layouts:
- *   YYYY/MM/filename          → default user, date = first of that month
- *   username/YYYY/MM/filename → that user,    date = first of that month
- * Returns null for paths that don't match either layout.
+ * Infers { user, takenAt, datePrecision } from a stored file's relative path.
+ * Layouts, most confident first:
+ *   [user/]YYYY/MM/…  → 'exact'  the uploader's own layout: real capture month
+ *   [user/]YYYY/…     → 'year'   a year folder the owner made by hand; month
+ *                                unknown, so takenAt is Jan 1 (a sort key only)
+ *   anything else     → 'none'   no date at all; takenAt 0, sorts under "Undated"
+ *
+ * The optional leading segment is read as a username only when a year folder
+ * sits below it, so a folder the customer drops at the storage root (e.g.
+ * "Old Photos/") stays with the default user instead of inventing an account.
+ * Always returns a result — every media file gets imported, dated or not.
  */
-function parseStoragePath(relPath) {
+function inferFromPath(relPath) {
   const parts = relPath.split('/');
-  let user, year, month;
-  if (parts.length === 3 && /^\d{4}$/.test(parts[0]) && /^\d{2}$/.test(parts[1])) {
-    user = DEFAULT_USER;
-    [year, month] = [parseInt(parts[0]), parseInt(parts[1]) - 1];
-  } else if (parts.length === 4 && /^\d{4}$/.test(parts[1]) && /^\d{2}$/.test(parts[2])) {
-    user = parts[0];
-    [year, month] = [parseInt(parts[1]), parseInt(parts[2]) - 1];
-  } else {
-    return null;
+
+  let user = DEFAULT_USER;
+  let rest = parts;
+  if (parts.length >= 2 && plausibleYear(parts[0]) == null) {
+    // A leading non-year folder is a username only if a year sits under it;
+    // otherwise it's just an album-ish folder belonging to the default user.
+    if (parts.slice(1).some((p) => plausibleYear(p) != null)) {
+      user = parts[0];
+      rest = parts.slice(1);
+    }
   }
-  return { user, takenAt: new Date(year, month, 1).getTime() };
+
+  const year = rest.length >= 1 ? plausibleYear(rest[0]) : null;
+  if (year == null) return { user, takenAt: 0, datePrecision: 'none' };
+
+  const monthNum = rest.length >= 2 && /^\d{2}$/.test(rest[1]) ? parseInt(rest[1], 10) : NaN;
+  if (monthNum >= 1 && monthNum <= 12) {
+    return { user, takenAt: new Date(year, monthNum - 1, 1).getTime(), datePrecision: 'exact' };
+  }
+  return { user, takenAt: new Date(year, 0, 1).getTime(), datePrecision: 'year' };
 }
 
 function hashFile(abs) {
