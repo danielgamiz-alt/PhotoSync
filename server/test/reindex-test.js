@@ -86,6 +86,29 @@ async function main() {
     // Running it again finds nothing new (already indexed).
     const again = await storage.reindex();
     check('reindex is idempotent: second scan adds 0', again.added === 0, `added ${again.added}`);
+
+    // The imported files must survive a restart — reopen the same folder with a
+    // fresh Storage (as the app does on launch) and confirm they're all there.
+    const reopened = new Storage(dir);
+    await reopened.init();
+    check('reindex persists across a restart', reopened.count() === 5, `count ${reopened.count()}`);
+    check('restart keeps the year-folder owner (alice)',
+      reopened.list().some((m) => m.user === 'alice' && m.path === 'alice/2023/Trip/scan.png'));
+
+    // Checkpointing: a big scan saves progress incrementally, not just at the
+    // end, so an interrupted first scan doesn't lose everything. Drop enough
+    // new files and use a tiny saveEvery, then count saveIndex calls.
+    const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'ps-reindex-ckpt-'));
+    const ck = new Storage(dir2);
+    await ck.init();
+    for (let i = 0; i < 7; i++) drop(dir2, `2020/pic${i}.jpg`, 'ck' + i);
+    let saves = 0;
+    const realSave = ck.saveIndex.bind(ck);
+    ck.saveIndex = async () => { saves++; return realSave(); };
+    const ckRes = await ck.reindex({ saveEvery: 2 });
+    check('checkpoint: all 7 imported', ckRes.added === 7, `added ${ckRes.added}`);
+    check('checkpoint: saved progress mid-scan (not just once at the end)', saves > 1, `saves ${saves}`);
+    fs.rmSync(dir2, { recursive: true, force: true });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
