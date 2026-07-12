@@ -126,17 +126,22 @@
     for (const h of [...selected]) {
       if (!media.some((m) => m.hash === h)) selected.delete(h);
     }
+    // Now that we've reached the app, reveal the bar so "Scan for new files"
+    // is always available (the account dropdown inside it is shown separately).
+    $('galleryBar').classList.remove('hidden');
     renderAccountSelector();
     renderGallery();
     updateSelBar();
   }
 
   function renderAccountSelector() {
-    const bar = $('galleryBar');
     const sel = $('accountSelect');
-    // Only worth showing once there's more than one account to choose between.
+    // The account dropdown is only worth showing once there's more than one
+    // account to choose between. The bar itself (and its "Scan for new files"
+    // button) stays visible regardless — see loadMedia — so you can always
+    // import folders even when the library still has a single account.
     const multi = accounts.length > 1;
-    bar.classList.toggle('hidden', !multi);
+    $('acctPicker').classList.toggle('hidden', !multi);
     if (!multi) return;
 
     const total = accounts.reduce((n, a) => n + a.count, 0);

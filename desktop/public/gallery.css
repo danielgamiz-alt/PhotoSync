@@ -27,6 +27,7 @@
   padding: 6px 4px 10px;
 }
 .gallery-bar { display: flex; align-items: center; gap: 8px; padding: 12px 4px 4px; }
+.acct-picker { display: inline-flex; align-items: center; gap: 8px; }
 .gallery-bar-spacer { flex: 1; }
 .btn-sm { font-size: 12px; padding: 4px 10px; }
 .scan-notice {
