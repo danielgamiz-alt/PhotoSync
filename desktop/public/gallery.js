@@ -16,6 +16,9 @@
   let lightboxIndex = -1;
   let activeTab = 'photos';
   let lastRev = -1; // library revision last rendered; poll re-fetches only on change
+  let groups = []; // date sections: { key, label, items:[global media index...] }
+  let cols = 1; // tiles per row at the current width (recomputed on render/resize)
+  let tileH = 0; // square tile height in px, used to reserve section heights
 
   // 'default' is the no-account folder (e.g. older uploads) — show it as "Me".
   const accountLabel = (name) => (name === 'default' ? 'Me' : name);
@@ -171,10 +174,11 @@
     const root = $('gallery');
     if (media.length === 0) {
       root.innerHTML = '';
+      groups = [];
       return;
     }
 
-    const groups = [];
+    groups = [];
     let cur = null;
     media.forEach((m, i) => {
       const k = groupKey(m);
@@ -185,28 +189,36 @@
       cur.items.push(i);
     });
 
+    // Render only the section shells (header + an empty, height-reserved grid).
+    // Each section's tiles are mounted on demand as it nears the viewport — with
+    // tens of thousands of photos, keeping every tile in the DOM made scrolling
+    // and jump-to-middle slow. Reserving the exact grid height up front keeps
+    // the scrollbar and scroll position stable whether or not tiles are mounted.
+    // See computeLayout / reserveHeights / observeSections.
     root.innerHTML = groups
       .map(
-        (g) => `<div class="day" data-daykey="${g.key}">
+        (g, gi) => `<div class="day" data-gi="${gi}" data-daykey="${g.key}">
           <div class="day-header">
             <div class="day-check" role="button" title="Select all" aria-label="Select all photos from ${escapeHtml(g.label)}">✓</div>
             <span class="day-title">${escapeHtml(g.label)}</span>
             <span class="day-count">${g.items.length}</span>
           </div>
-          <div class="day-grid">${g.items.map(renderTile).join('')}</div>
+          <div class="day-grid" data-gi="${gi}"></div>
         </div>`
       )
       .join('');
+
+    computeLayout();
+    reserveHeights();
+    observeSections();
     applySelectionClasses();
-    setupLazyLoad();
   }
 
   function renderTile(i) {
     const m = media[i];
     // Media carries `data-src` only — it isn't fetched until the tile nears the
-    // viewport (see setupLazyLoad). With a big library this is the difference
-    // between thousands of immediate requests and just the few around the
-    // scroll position.
+    // viewport (see the tileObserver). Combined with section mounting, only the
+    // few tiles around the scroll position exist and load at any time.
     // If a tiny blur placeholder is available it is set as the immediate src
     // so tiles are never blank while the real thumbnail loads.
     if (m.type === 'video') {
@@ -289,6 +301,7 @@
     drainThumbQueue();
   }
   let tileObserver = null;
+  let sectionObserver = null;
   function loadTileMedia(el) {
     const src = el.dataset.src;
     if (!src || el.getAttribute('src') === src) return;
@@ -321,8 +334,8 @@
       el.removeAttribute('src');
     }
   }
-  function setupLazyLoad() {
-    if (tileObserver) tileObserver.disconnect();
+  function ensureTileObserver() {
+    if (tileObserver) return;
     tileObserver = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -332,10 +345,87 @@
           else unloadTileMedia(el);
         }
       },
-      { rootMargin: '2000px 0px' }
+      { rootMargin: '1000px 0px' }
     );
-    document.querySelectorAll('#gallery .tile').forEach((t) => tileObserver.observe(t));
   }
+
+  // ---- windowed section rendering ------------------------------------------
+  // Tiles are uniform squares, so each section's pixel height is known from its
+  // photo count without laying the tiles out. We reserve that height, then
+  // mount/unmount each section's tiles as it enters/leaves an expanded viewport.
+  const GRID_GAP = 4;   // must match .day-grid `gap` in gallery.css
+  const MIN_TILE = 160; // must match .day-grid minmax(160px, …) in gallery.css
+
+  function computeLayout() {
+    const grid = $('gallery').querySelector('.day-grid');
+    const w = (grid ? grid.clientWidth : $('gallery').clientWidth) || 0;
+    if (w < MIN_TILE) { cols = 1; tileH = MIN_TILE; return; } // hidden/too-narrow fallback
+    cols = Math.max(1, Math.floor((w + GRID_GAP) / (MIN_TILE + GRID_GAP)));
+    tileH = Math.max(1, Math.round((w - (cols - 1) * GRID_GAP) / cols)); // square tiles
+  }
+
+  function sectionHeight(count) {
+    const rows = Math.ceil(count / cols);
+    return rows > 0 ? rows * tileH + (rows - 1) * GRID_GAP : 0;
+  }
+
+  function reserveHeights() {
+    $('gallery').querySelectorAll('.day-grid').forEach((grid) => {
+      const g = groups[+grid.dataset.gi];
+      if (g) grid.style.minHeight = sectionHeight(g.items.length) + 'px';
+    });
+  }
+
+  function mountSection(grid) {
+    if (grid.dataset.mounted || !groups[+grid.dataset.gi]) return;
+    const g = groups[+grid.dataset.gi];
+    grid.innerHTML = g.items.map(renderTile).join('');
+    grid.dataset.mounted = '1';
+    ensureTileObserver();
+    grid.querySelectorAll('.tile').forEach((t) => {
+      t.classList.toggle('selected', selected.has(t.dataset.hash));
+      tileObserver.observe(t);
+    });
+  }
+
+  function unmountSection(grid) {
+    if (!grid.dataset.mounted) return;
+    grid.querySelectorAll('.tile').forEach((t) => {
+      if (tileObserver) tileObserver.unobserve(t);
+      const el = t.querySelector('img, video');
+      if (el) unloadTileMedia(el);
+    });
+    grid.innerHTML = '';
+    delete grid.dataset.mounted;
+  }
+
+  function observeSections() {
+    ensureTileObserver();
+    tileObserver.disconnect(); // drop any stale tile observations from a prior render
+    if (sectionObserver) sectionObserver.disconnect();
+    sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) mountSection(e.target);
+          else unmountSection(e.target);
+        }
+      },
+      { rootMargin: '1400px 0px' }
+    );
+    $('gallery').querySelectorAll('.day-grid').forEach((grid) => sectionObserver.observe(grid));
+  }
+
+  // Re-measure on width changes: recompute geometry, re-reserve heights (mounted
+  // sections' real tiles reflow via CSS grid to match).
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (groups.length === 0) return;
+      computeLayout();
+      reserveHeights();
+    }, 150);
+  });
 
   // ---- selection -----------------------------------------------------------
   function toggleOne(hash) {
@@ -346,8 +436,12 @@
     const [lo, hi] = a < b ? [a, b] : [b, a];
     for (let i = lo; i <= hi; i++) selected.add(media[i].hash);
   }
+  // Works off the group's item list, not the DOM, so "select all" is correct
+  // even when the section's tiles aren't currently mounted.
   function toggleDay(dayEl) {
-    const hashes = [...dayEl.querySelectorAll('.tile')].map((t) => t.dataset.hash);
+    const g = groups[+dayEl.dataset.gi];
+    if (!g) return;
+    const hashes = g.items.map((i) => media[i].hash);
     const allSelected = hashes.length > 0 && hashes.every((h) => selected.has(h));
     hashes.forEach((h) => (allSelected ? selected.delete(h) : selected.add(h)));
   }
@@ -357,8 +451,8 @@
       t.classList.toggle('selected', selected.has(t.dataset.hash));
     });
     document.querySelectorAll('#gallery .day').forEach((day) => {
-      const tiles = [...day.querySelectorAll('.tile')];
-      const all = tiles.length > 0 && tiles.every((t) => selected.has(t.dataset.hash));
+      const g = groups[+day.dataset.gi];
+      const all = g && g.items.length > 0 && g.items.every((i) => selected.has(media[i].hash));
       day.classList.toggle('day-selected', all);
     });
   }
