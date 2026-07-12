@@ -133,11 +133,19 @@ async function main() {
     check('list: newest first', list.items[0].hash === hv, 'video (latest) should be first');
     check('list: video typed', list.items.find((m) => m.hash === hv).type === 'video');
     check('list: image typed', list.items.find((m) => m.hash === h1).type === 'image');
+    check('list: carries a numeric revision', typeof list.rev === 'number', `rev ${list.rev}`);
+
+    // version probe: cheap counter the gallery polls instead of the whole list
+    const ver = await fetch(`${BASE}/api/media/version`).then((r) => r.json());
+    check('version: matches list rev', ver.rev === list.rev, `${ver.rev} vs ${list.rev}`);
+    check('version: reports count', ver.count === 3, `got ${ver.count}`);
 
     // file serving
     const fileRes = await fetch(`${BASE}/media/file?hash=${h1}`);
     check('file: 200', fileRes.status === 200);
     check('file: accept-ranges', fileRes.headers.get('accept-ranges') === 'bytes');
+    check('file: immutable long cache', /immutable/.test(fileRes.headers.get('cache-control') || ''),
+      fileRes.headers.get('cache-control'));
     const body = Buffer.from(await fileRes.arrayBuffer());
     check('file: bytes match', body.equals(Buffer.concat([PNG_1x1, Buffer.from('1')])));
 
@@ -189,12 +197,17 @@ async function main() {
     const missing = await fetch(`${BASE}/media/file?hash=deadbeef`);
     check('file: missing → 404', missing.status === 404);
 
+    // the revision advances when the library changes, so the poll knows to refetch
+    const revBefore = (await fetch(`${BASE}/api/media/version`).then((r) => r.json())).rev;
+
     // delete one
     const del = await fetch(`${BASE}/api/media/delete`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ hashes: [h2] }),
     }).then((r) => r.json());
     check('delete: 1 removed', del.deleted === 1, `got ${del.deleted}`);
+    const revAfter = (await fetch(`${BASE}/api/media/version`).then((r) => r.json())).rev;
+    check('version: rev advances after a delete', revAfter > revBefore, `${revBefore} → ${revAfter}`);
     check('delete: count now 2', del.fileCount === 2, `got ${del.fileCount}`);
     check('delete: file gone from disk', !fs.existsSync(path.join(dir, '2026', '05', 'b.png')));
 

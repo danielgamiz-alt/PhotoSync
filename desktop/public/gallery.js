@@ -15,6 +15,7 @@
   let lastClickedIndex = null;
   let lightboxIndex = -1;
   let activeTab = 'photos';
+  let lastRev = -1; // library revision last rendered; poll re-fetches only on change
 
   // 'default' is the no-account folder (e.g. older uploads) — show it as "Me".
   const accountLabel = (name) => (name === 'default' ? 'Me' : name);
@@ -126,6 +127,7 @@
     for (const h of [...selected]) {
       if (!media.some((m) => m.hash === h)) selected.delete(h);
     }
+    if (typeof data.rev === 'number') lastRev = data.rev;
     // Now that we've reached the app, reveal the bar so "Scan for new files"
     // is always available (the account dropdown inside it is shown separately).
     $('galleryBar').classList.remove('hidden');
@@ -570,10 +572,18 @@
   window.reloadGallery = () => loadMedia();
 
   // ---- polling -------------------------------------------------------------
+  // Poll a tiny version counter, not the whole media list. With tens of
+  // thousands of photos the list is multiple MB; re-fetching and re-parsing it
+  // every few seconds was pure waste when nothing had changed. Only pull the
+  // full list when the library's revision actually moved (upload, scan, delete).
   loadMedia();
-  setInterval(() => {
-    if (activeTab === 'photos' && selected.size === 0 && $('lightbox').classList.contains('hidden')) {
-      loadMedia();
+  setInterval(async () => {
+    if (activeTab !== 'photos' || selected.size > 0 || !$('lightbox').classList.contains('hidden')) return;
+    try {
+      const { rev } = await fetch('/api/media/version').then((r) => r.json());
+      if (typeof rev === 'number' && rev !== lastRev) loadMedia();
+    } catch {
+      /* disconnected — app.js shows the banner; nothing to refresh */
     }
   }, 8000);
 })();

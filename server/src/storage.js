@@ -22,6 +22,11 @@ class Storage {
     this.root = storagePath;
     this.indexFile = path.join(storagePath, 'index.json');
     this.index = {};
+    // Bumped on every successful save so clients can cheaply tell whether the
+    // library changed (poll a tiny counter instead of re-fetching the whole
+    // media list). Resets to 0 on restart, which is fine — the page reloads
+    // too, so it re-reads the full list once on connect.
+    this.rev = 0;
   }
 
   async init() {
@@ -61,6 +66,7 @@ class Storage {
     const tmp = this.indexFile + '.tmp';
     await fsp.writeFile(tmp, JSON.stringify(this.index, null, 1));
     await fsp.rename(tmp, this.indexFile);
+    this.rev++;
   }
 
   has(hash, username = DEFAULT_USER) {
