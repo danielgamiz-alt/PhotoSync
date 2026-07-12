@@ -80,7 +80,14 @@ async function route(req, res, deps) {
     const account = url.searchParams.get('account') || '';
     const items = account && account !== 'all' ? all.filter((m) => m.user === account) : all;
 
-    return sendJson(res, 200, { items, accounts, thumbnails: deps.thumbnailer.available });
+    return sendJson(res, 200, { items, accounts, thumbnails: deps.thumbnailer.available, rev: storage.rev });
+  }
+
+  // A tiny liveness/version probe so the gallery can poll cheaply and only
+  // re-fetch the (multi-MB) media list when the library actually changed.
+  if (p === '/api/media/version' && req.method === 'GET') {
+    const storage = deps.getStorage();
+    return sendJson(res, 200, { rev: storage ? storage.rev : 0, count: storage ? storage.count() : 0 });
   }
 
   if (p === '/media/thumb' && req.method === 'GET') {
@@ -277,7 +284,10 @@ function serveFile(req, res, absPath, mime) {
   const headers = {
     'content-type': mime,
     'accept-ranges': 'bytes',
-    'cache-control': 'private, max-age=300',
+    // Media URLs are addressed by content hash (or a stable trash id), so the
+    // bytes never change — let the browser keep them for good and skip the
+    // constant thumbnail re-downloads when scrolling back over the library.
+    'cache-control': 'private, max-age=31536000, immutable',
   };
 
   const range = req.headers.range;
