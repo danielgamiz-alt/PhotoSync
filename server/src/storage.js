@@ -230,11 +230,16 @@ class Storage {
    * (no date at all) is still imported rather than ignored — see
    * inferFromPath for how the capture date and its precision are derived.
    *
+   * Progress is written to disk every `saveEvery` new files, not just at the
+   * end, so a large first scan (which can take many minutes hashing tens of
+   * thousands of files) survives the app being closed or restarted midway —
+   * whatever was imported so far persists instead of being lost.
+   *
    * Returns { added, skipped, total }: added = files newly indexed,
    * skipped = files passed over as unsupported (not an image/video),
    * total = the new index size.
    */
-  async reindex() {
+  async reindex({ saveEvery = 500 } = {}) {
     // Collect paths and hashes already known so we can skip them fast.
     const knownPaths = new Set();
     for (const byUser of Object.values(this.index)) {
@@ -243,6 +248,7 @@ class Storage {
 
     let added = 0;
     let skipped = 0;
+    let sinceSave = 0;
     const scan = async (dir) => {
       let entries;
       try { entries = await fsp.readdir(dir, { withFileTypes: true }); }
@@ -282,12 +288,19 @@ class Storage {
           };
           knownPaths.add(relPath);
           added++;
+
+          // Checkpoint to disk periodically so an interrupted scan keeps the
+          // work done so far (see the method comment).
+          if (++sinceSave >= saveEvery) {
+            await this.saveIndex();
+            sinceSave = 0;
+          }
         }
       }
     };
 
     await scan(this.root);
-    if (added > 0) await this.saveIndex();
+    if (sinceSave > 0) await this.saveIndex();
     return { added, skipped, total: this.count() };
   }
 
