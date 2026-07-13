@@ -163,6 +163,14 @@ async function main() {
     let sharpOk = true;
     try { require('sharp'); } catch { sharpOk = false; }
 
+    // blur placeholder: a tiny JPEG when sharp is present, a graceful 404 when
+    // it isn't (the gallery simply shows no placeholder in that case).
+    const blurRes = await fetch(`${BASE}/media/blur?hash=${h1}`);
+    check('blur: served or gracefully absent', blurRes.status === (sharpOk ? 200 : 404), `got ${blurRes.status}`);
+    if (sharpOk) check('blur: is jpeg', (blurRes.headers.get('content-type') || '').includes('jpeg'));
+    const blurMissing = await fetch(`${BASE}/media/blur?hash=deadbeef`);
+    check('blur: missing → 404', blurMissing.status === 404);
+
     // ---- responsive thumbnail variants (/media/thumb?w=) -----------------
     // `w` is snapped to an allowlisted size and cached per-size, so the grid can
     // fetch a 256w (1×) or 512w (2×/retina) copy of the same tile. Uses a real

@@ -102,6 +102,15 @@ async function route(req, res, deps) {
     return serveFile(req, res, entry.abs, mimeFor(entry.path)); // fallback: original
   }
 
+  if (p === '/media/blur' && req.method === 'GET') {
+    const entry = entryFor(deps, url.searchParams.get('hash'));
+    if (!entry) return sendJson(res, 404, { error: 'not found' });
+    const type = mimeFor(entry.path).startsWith('video') ? 'video' : 'image';
+    const blur = await deps.thumbnailer.blurFile(entry.hash, entry.abs, type);
+    if (!blur) return sendJson(res, 404, { error: 'no blur' });
+    return serveFile(req, res, blur, 'image/jpeg');
+  }
+
   if (p === '/media/file' && req.method === 'GET') {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });

@@ -43,8 +43,6 @@ class Thumbnailer {
    *  switches the backup folder). */
   constructor(getRoot) {
     this.getRoot = getRoot;
-    // hash → 'data:image/jpeg;base64,...' for tiny blur placeholders
-    this._blurCache = new Map();
     this._warmupAbort = false;
   }
 
@@ -121,31 +119,26 @@ class Thumbnailer {
     }
   }
 
-  /** Returns the cached base64 blur data URI for a hash, or null. */
-  getBlur(hash) {
-    return this._blurCache.get(hash) || null;
-  }
-
-  /** Generate (or load from disk) a tiny blur JPEG for one image hash. */
-  async _ensureBlur(hash, absSource) {
-    if (this._blurCache.has(hash)) return;
-    const blurFile = this._blurPath(hash);
+  /**
+   * Returns the path to a cached tiny blur JPEG for an image, generating it on
+   * first request. Served by the gallery as an instant, browser-cacheable
+   * placeholder while the full thumbnail loads. Returns null when a blur isn't
+   * possible (no sharp, a video, or a decode failure).
+   */
+  async blurFile(hash, absSource, type) {
+    if (!sharp || type === 'video') return null;
+    const out = this._blurPath(hash);
     try {
-      if (fs.existsSync(blurFile)) {
-        const buf = await fsp.readFile(blurFile);
-        this._blurCache.set(hash, `data:image/jpeg;base64,${buf.toString('base64')}`);
-        return;
-      }
-      await fsp.mkdir(path.dirname(blurFile), { recursive: true });
-      const buf = await sharp(absSource)
-        .rotate()
+      if (fs.existsSync(out)) return out;
+      await fsp.mkdir(path.dirname(out), { recursive: true });
+      await sharp(absSource)
+        .rotate() // honour EXIF orientation
         .resize(BLUR_SIZE, BLUR_SIZE, { fit: 'cover' })
         .jpeg({ quality: 40 })
-        .toBuffer();
-      await fsp.writeFile(blurFile, buf);
-      this._blurCache.set(hash, `data:image/jpeg;base64,${buf.toString('base64')}`);
+        .toFile(out);
+      return out;
     } catch {
-      // Non-fatal — blur just won't be available for this item.
+      return null;
     }
   }
 
@@ -169,7 +162,7 @@ class Thumbnailer {
         // Warm only the grid's 1× baseline + blur; larger variants are cheap to
         // make on demand and warming them all would bloat the cache upfront.
         await this.thumb(m.hash, abs, 'image', DEFAULT_THUMB);
-        await this._ensureBlur(m.hash, abs);
+        await this.blurFile(m.hash, abs, 'image');
       }
     };
 
@@ -183,7 +176,6 @@ class Thumbnailer {
   }
 
   async forget(hash) {
-    this._blurCache.delete(hash);
     const dir = path.join(this.getRoot(), THUMB_DIR);
     const files = [
       ...THUMB_SIZES.map((s) => this._thumbPath(hash, s)),

@@ -216,11 +216,11 @@
 
   function renderTile(i) {
     const m = media[i];
-    // Media carries `data-src` only — it isn't fetched until the tile nears the
-    // viewport (see the tileObserver). Combined with section mounting, only the
-    // few tiles around the scroll position exist and load at any time.
-    // If a tiny blur placeholder is available it is set as the immediate src
-    // so tiles are never blank while the real thumbnail loads.
+    // Media carries `data-src`/`data-srcset` (and `data-blur`) only — nothing is
+    // fetched until the tile nears the viewport (see the tileObserver). Combined
+    // with section mounting, only the few tiles around the scroll position exist
+    // and load at any time. On intersect the tiny blur loads first as an instant
+    // placeholder, then the full responsive thumbnail sharpens in over it.
     if (m.type === 'video') {
       return `<div class="tile video-tile" data-index="${i}" data-hash="${m.hash}">
         <video muted data-src="/media/file?hash=${m.hash}#t=0.1"></video>
@@ -228,9 +228,9 @@
         <div class="tile-check">✓</div>
       </div>`;
     }
-    const blurAttr = m.blur
-      ? ` src="${m.blur}" data-blur="${m.blur}" class="thumb-blur"`
-      : '';
+    // Blur placeholders come from a dedicated endpoint (browser-cached) rather
+    // than inline data URIs, so the /api/media poll stays small on big libraries.
+    const blurAttr = thumbsAvailable ? ` data-blur="/media/blur?hash=${m.hash}"` : '';
     // Responsive grid thumbnail: the browser picks 256w (1×) or 512w (2×/retina)
     // from the tile's CSS width (`sizes`). Both srcset and src stay in data-*
     // attributes until the tile nears the viewport (see the lazy loader), so
@@ -319,6 +319,13 @@
       el.preload = 'metadata';
       el.setAttribute('src', src);
       return;
+    }
+    // Paint the tiny blur placeholder immediately (browser-cached, ~0.5 KB) so
+    // the tile is never blank while the full thumbnail loads via the queue.
+    const blur = el.dataset.blur;
+    if (blur && el.getAttribute('src') !== blur) {
+      el.setAttribute('src', blur);
+      el.classList.add('thumb-blur');
     }
     enqueueThumb(el, src);
   }
