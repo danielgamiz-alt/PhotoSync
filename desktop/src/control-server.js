@@ -98,7 +98,7 @@ async function route(req, res, deps) {
     // grid sends 256/512 for 1×/2× tiles. Omitted → the default baseline.
     const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
     const thumb = await deps.thumbnailer.thumb(entry.hash, entry.abs, type, w);
-    if (thumb) return serveFile(req, res, thumb, 'image/jpeg');
+    if (thumb) return serveFile(req, res, thumb, mimeFor(thumb));
     return serveFile(req, res, entry.abs, mimeFor(entry.path)); // fallback: original
   }
 
@@ -108,7 +108,7 @@ async function route(req, res, deps) {
     const type = mimeFor(entry.path).startsWith('video') ? 'video' : 'image';
     const blur = await deps.thumbnailer.blurFile(entry.hash, entry.abs, type);
     if (!blur) return sendJson(res, 404, { error: 'no blur' });
-    return serveFile(req, res, blur, 'image/jpeg');
+    return serveFile(req, res, blur, mimeFor(blur));
   }
 
   if (p === '/media/file' && req.method === 'GET') {
@@ -118,7 +118,7 @@ async function route(req, res, deps) {
   }
 
   // Full-screen viewer source. Videos stream straight from disk. Images are
-  // served as an inside-fit JPEG sized to the viewport (`w` = longest screen
+  // served as an inside-fit WebP sized to the viewport (`w` = longest screen
   // edge × DPR, snapped to an allowlisted size) — so a fit-to-window lightbox
   // no longer downloads a 40MP original, and formats the browser can't decode
   // (HEIC/TIFF/BMP…) still open because they're converted in the same step.
@@ -132,8 +132,8 @@ async function route(req, res, deps) {
       return serveFile(req, res, entry.abs, mime);
     }
     const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
-    const jpeg = await deps.thumbnailer.view(entry.hash, entry.abs, 'image', w);
-    if (jpeg) return serveFile(req, res, jpeg, 'image/jpeg');
+    const view = await deps.thumbnailer.view(entry.hash, entry.abs, 'image', w);
+    if (view) return serveFile(req, res, view, mimeFor(view));
     return serveFile(req, res, entry.abs, mime); // sharp missing / decode failed
   }
 
