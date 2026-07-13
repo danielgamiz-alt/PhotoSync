@@ -231,8 +231,15 @@
     const blurAttr = m.blur
       ? ` src="${m.blur}" data-blur="${m.blur}" class="thumb-blur"`
       : '';
+    // Responsive grid thumbnail: the browser picks 256w (1×) or 512w (2×/retina)
+    // from the tile's CSS width (`sizes`). Both srcset and src stay in data-*
+    // attributes until the tile nears the viewport (see the lazy loader), so
+    // idle tiles fetch nothing. `sizes` is a plain attribute and is kept in sync
+    // with the measured tile width on resize (see the resize handler).
+    const base = `/media/thumb?hash=${m.hash}`;
+    const srcset = `${base}&amp;w=256 256w, ${base}&amp;w=512 512w`;
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
-      <img${blurAttr} data-src="/media/thumb?hash=${m.hash}" alt="">
+      <img${blurAttr} data-src="${base}&amp;w=256" data-srcset="${srcset}" sizes="${tileH || 256}px" alt="">
       <div class="tile-check">✓</div>
     </div>`;
   }
@@ -291,6 +298,9 @@
     img._releaseThumb = release;
     img.addEventListener('load', onSettle);
     img.addEventListener('error', onSettle);
+    // Set srcset first so the browser resolves the responsive candidate against
+    // `sizes` when src is assigned, then src as the no-srcset fallback.
+    if (img.dataset.srcset) img.setAttribute('srcset', img.dataset.srcset);
     img.setAttribute('src', src);
   }
   function enqueueThumb(img, src) {
@@ -325,6 +335,9 @@
     // below won't reliably fire load/error, so we must release it ourselves.
     el._thumbQueued = false;
     if (el._releaseThumb) el._releaseThumb();
+    // Drop the responsive candidates too so the blur/empty state actually shows
+    // (a lingering srcset would otherwise keep the real thumbnail painted).
+    el.removeAttribute('srcset');
     // Restore blur placeholder if one exists, otherwise clear src.
     el.classList.remove('thumb-loaded');
     if (blurSrc) {
@@ -424,6 +437,13 @@
       if (groups.length === 0) return;
       computeLayout();
       reserveHeights();
+      // Tiles stay mounted across a resize, so update their `sizes` to the new
+      // tile width — the browser then re-picks the right srcset candidate.
+      if (tileH > 0) {
+        document
+          .querySelectorAll('#gallery .tile img[data-srcset]')
+          .forEach((img) => { img.sizes = tileH + 'px'; });
+      }
     }, 150);
   });
 
@@ -526,13 +546,20 @@
     $('lbStage').innerHTML = ''; // stop video playback
     lightboxIndex = -1;
   }
+  // Longest screen edge × DPR, so the viewer fetches a copy sized to this
+  // display rather than the full-resolution original. The server snaps this to
+  // the nearest allowlisted variant (1024 for laptops, 2048 for 4K/retina).
+  function viewWidth() {
+    const edge = Math.max(window.innerWidth, window.innerHeight);
+    return Math.ceil(edge * (window.devicePixelRatio || 1));
+  }
   function renderLightbox() {
     const m = media[lightboxIndex];
     if (!m) return;
     $('lbStage').innerHTML =
       m.type === 'video'
         ? `<video src="/media/file?hash=${m.hash}" controls autoplay></video>`
-        : `<img src="/media/view?hash=${m.hash}" alt="">`;
+        : `<img src="/media/view?hash=${m.hash}&w=${viewWidth()}" alt="">`;
   }
   function navLightbox(delta) {
     const n = media.length;
