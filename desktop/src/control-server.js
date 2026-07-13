@@ -4,7 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const { mimeFor, isWebSafeImage } = require('./gallery-store');
+const { mimeFor } = require('./gallery-store');
 
 // The private dashboard. Bound to 127.0.0.1 ONLY — it can change the storage
 // folder, API key, autostart, etc., so it must never be reachable from the LAN
@@ -94,7 +94,10 @@ async function route(req, res, deps) {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });
     const type = mimeFor(entry.path).startsWith('video') ? 'video' : 'image';
-    const thumb = await deps.thumbnailer.thumb(entry.hash, entry.abs, type);
+    // `w` picks the responsive variant (snapped to an allowlisted size); the
+    // grid sends 256/512 for 1×/2× tiles. Omitted → the default baseline.
+    const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
+    const thumb = await deps.thumbnailer.thumb(entry.hash, entry.abs, type, w);
     if (thumb) return serveFile(req, res, thumb, 'image/jpeg');
     return serveFile(req, res, entry.abs, mimeFor(entry.path)); // fallback: original
   }
@@ -105,21 +108,24 @@ async function route(req, res, deps) {
     return serveFile(req, res, entry.abs, mimeFor(entry.path));
   }
 
-  // Full-screen viewer source. Web-native images (and videos) stream straight
-  // from disk at full quality; formats the browser can't decode (HEIC/TIFF/
-  // BMP…) are converted to a large JPEG so old libraries still open — without
-  // this the lightbox showed "not supported" for those. Falls back to the
-  // original bytes if conversion isn't possible (e.g. sharp missing).
+  // Full-screen viewer source. Videos stream straight from disk. Images are
+  // served as an inside-fit JPEG sized to the viewport (`w` = longest screen
+  // edge × DPR, snapped to an allowlisted size) — so a fit-to-window lightbox
+  // no longer downloads a 40MP original, and formats the browser can't decode
+  // (HEIC/TIFF/BMP…) still open because they're converted in the same step.
+  // Falls back to the original bytes if resizing isn't possible (e.g. sharp
+  // missing) so nothing ever fails to display.
   if (p === '/media/view' && req.method === 'GET') {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });
     const mime = mimeFor(entry.path);
-    if (mime.startsWith('video') || isWebSafeImage(entry.path)) {
+    if (mime.startsWith('video')) {
       return serveFile(req, res, entry.abs, mime);
     }
-    const jpeg = await deps.thumbnailer.display(entry.hash, entry.abs, 'image');
+    const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
+    const jpeg = await deps.thumbnailer.view(entry.hash, entry.abs, 'image', w);
     if (jpeg) return serveFile(req, res, jpeg, 'image/jpeg');
-    return serveFile(req, res, entry.abs, mime);
+    return serveFile(req, res, entry.abs, mime); // sharp missing / decode failed
   }
 
   if (p === '/api/media/reveal' && req.method === 'POST') {

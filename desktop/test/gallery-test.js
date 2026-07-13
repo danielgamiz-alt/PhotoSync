@@ -160,32 +160,70 @@ async function main() {
     const thumbRes = await fetch(`${BASE}/media/thumb?hash=${h1}`);
     check('thumb: 200', thumbRes.status === 200);
 
+    let sharpOk = true;
+    try { require('sharp'); } catch { sharpOk = false; }
+
+    // ---- responsive thumbnail variants (/media/thumb?w=) -----------------
+    // `w` is snapped to an allowlisted size and cached per-size, so the grid can
+    // fetch a 256w (1×) or 512w (2×/retina) copy of the same tile. Uses a real
+    // (reducible) source image — the 1×1 fixtures can't be cover-cropped.
+    if (sharpOk) {
+      const sharp = require('sharp');
+      const { Readable } = require('stream');
+      const big = await sharp({ create: { width: 600, height: 400, channels: 3, background: { r: 200, g: 30, b: 60 } } })
+        .png().toBuffer();
+      const bigHash = (await storage.store(Readable.from(big), { filename: 'big.png', takenAt: 0 })).hash;
+
+      const t512 = await fetch(`${BASE}/media/thumb?hash=${bigHash}&w=512`);
+      check('thumb: w=512 → 200 jpeg', t512.status === 200 && t512.headers.get('content-type') === 'image/jpeg',
+        t512.headers.get('content-type'));
+      check('thumb: 512 variant cached on disk', fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t512.jpg`)));
+      await fetch(`${BASE}/media/thumb?hash=${bigHash}&w=256`);
+      check('thumb: 256 variant cached separately', fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t256.jpg`)));
+      // An out-of-range width is snapped to the largest allowlisted size, not honoured verbatim.
+      await fetch(`${BASE}/media/thumb?hash=${bigHash}&w=99999`);
+      check('thumb: oversized w snapped (no arbitrary-size file)',
+        !fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t99999.jpg`)));
+
+      // Drop the throwaway image so later count assertions see the original 3.
+      await storage.remove(bigHash);
+      await thumbnailer.forget(bigHash);
+    } else {
+      console.log('  skip thumb variants (sharp not installed)');
+    }
+
     // ---- full-screen viewer source (/media/view) -------------------------
-    // Web-native images stream through untouched, at full quality.
-    const viewPng = await fetch(`${BASE}/media/view?hash=${h1}`);
+    // With sharp, the viewer gets an inside-fit JPEG sized to `w` (snapped to an
+    // allowlisted size) instead of the full-resolution original — the responsive
+    // win. Without sharp it falls back to streaming the untouched original.
+    const viewPng = await fetch(`${BASE}/media/view?hash=${h1}&w=1024`);
     check('view: web-safe image → 200', viewPng.status === 200, `got ${viewPng.status}`);
-    check('view: web-safe served as original type', viewPng.headers.get('content-type') === 'image/png',
-      viewPng.headers.get('content-type'));
-    const viewPngBytes = Buffer.from(await viewPng.arrayBuffer());
-    check('view: web-safe bytes are the untouched original',
-      viewPngBytes.equals(Buffer.concat([PNG_1x1, Buffer.from('1')])));
+    if (sharpOk) {
+      check('view: web-safe downsized to jpeg', viewPng.headers.get('content-type') === 'image/jpeg',
+        viewPng.headers.get('content-type'));
+      check('view: 1024 variant cached on disk', fs.existsSync(path.join(dir, '.thumbs', `${h1}-v1024.jpg`)));
+    } else {
+      check('view: web-safe served as original type', viewPng.headers.get('content-type') === 'image/png',
+        viewPng.headers.get('content-type'));
+      const viewPngBytes = Buffer.from(await viewPng.arrayBuffer());
+      check('view: web-safe bytes are the untouched original',
+        viewPngBytes.equals(Buffer.concat([PNG_1x1, Buffer.from('1')])));
+    }
 
     // A format the browser can't render (TIFF) is converted to JPEG so the
     // lightbox can display it — the bug this endpoint fixes.
-    let sharpOk = true;
-    try { require('sharp'); } catch { sharpOk = false; }
     if (sharpOk) {
       const sharp = require('sharp');
       const tiff = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 9, g: 40, b: 90 } } })
         .tiff().toBuffer();
       const { Readable } = require('stream');
       const tiffHash = (await storage.store(Readable.from(tiff), { filename: 'heirloom.tiff', takenAt: 0 })).hash;
-      const viewTiff = await fetch(`${BASE}/media/view?hash=${tiffHash}`);
+      const viewTiff = await fetch(`${BASE}/media/view?hash=${tiffHash}&w=2048`);
       check('view: non-web image → 200', viewTiff.status === 200, `got ${viewTiff.status}`);
       check('view: non-web image converted to jpeg',
         viewTiff.headers.get('content-type') === 'image/jpeg', viewTiff.headers.get('content-type'));
       check('view: converted copy is cached on disk',
-        fs.existsSync(path.join(dir, '.thumbs', `${tiffHash}-view.jpg`)));
+        fs.existsSync(path.join(dir, '.thumbs', `${tiffHash}-v2048.jpg`)));
       // Drop the throwaway TIFF so later count assertions see the original 3.
       await storage.remove(tiffHash);
       await thumbnailer.forget(tiffHash);
