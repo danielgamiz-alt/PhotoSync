@@ -200,6 +200,22 @@ async function main() {
       console.log('  skip thumb variants (sharp not installed)');
     }
 
+    // ---- legacy JPEG cache sweep -----------------------------------------
+    // Derivatives are WebP now; the one-time sweep (run at warmup) purges any
+    // stale .jpg files left over from before the switch, but keeps .webp.
+    {
+      const thumbsDir = path.join(dir, '.thumbs');
+      await fs.promises.mkdir(thumbsDir, { recursive: true });
+      const staleJpg = path.join(thumbsDir, 'deadbeef-t256.jpg');
+      const keepWebp = path.join(thumbsDir, 'deadbeef-t256.webp');
+      await fs.promises.writeFile(staleJpg, 'old');
+      await fs.promises.writeFile(keepWebp, 'new');
+      await thumbnailer.sweepLegacyJpegs();
+      check('sweep: legacy .jpg removed', !fs.existsSync(staleJpg));
+      check('sweep: .webp preserved', fs.existsSync(keepWebp));
+      await fs.promises.unlink(keepWebp).catch(() => {});
+    }
+
     // ---- full-screen viewer source (/media/view) -------------------------
     // With sharp, the viewer gets an inside-fit WebP sized to `w` (snapped to an
     // allowlisted size) instead of the full-resolution original — the responsive

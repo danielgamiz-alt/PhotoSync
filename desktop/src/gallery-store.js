@@ -149,6 +149,9 @@ class Thumbnailer {
    * with existing files are skipped quickly.
    */
   async warmUp(items) {
+    // One-time migration cleanup before warming: everything the cache holds is
+    // WebP now, so purge any leftover JPEG derivatives from before the switch.
+    await this.sweepLegacyJpegs();
     if (!sharp) return;
     this._warmupAbort = false;
     const root = this.getRoot();
@@ -179,6 +182,28 @@ class Thumbnailer {
   /** Cancel any in-progress warmup (e.g. when the storage folder changes). */
   cancelWarmUp() {
     this._warmupAbort = true;
+  }
+
+  /**
+   * One-time migration cleanup: the derivative cache used to be JPEG and is now
+   * all WebP. Delete any leftover .jpg/.jpeg files in the cache dir so switching
+   * formats doesn't leave orphans on disk. The dir is exclusively this class's
+   * derivative cache, so nothing else is at risk. Idempotent — after the first
+   * pass there are none, making every later call a cheap no-op readdir.
+   */
+  async sweepLegacyJpegs() {
+    const dir = path.join(this.getRoot(), THUMB_DIR);
+    let names;
+    try {
+      names = await fsp.readdir(dir);
+    } catch {
+      return; // no cache dir yet — nothing to sweep
+    }
+    await Promise.all(
+      names
+        .filter((n) => n.endsWith('.jpg') || n.endsWith('.jpeg'))
+        .map((n) => fsp.unlink(path.join(dir, n)).catch(() => {}))
+    );
   }
 
   async forget(hash) {
