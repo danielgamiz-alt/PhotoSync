@@ -163,11 +163,11 @@ async function main() {
     let sharpOk = true;
     try { require('sharp'); } catch { sharpOk = false; }
 
-    // blur placeholder: a tiny JPEG when sharp is present, a graceful 404 when
+    // blur placeholder: a tiny WebP when sharp is present, a graceful 404 when
     // it isn't (the gallery simply shows no placeholder in that case).
     const blurRes = await fetch(`${BASE}/media/blur?hash=${h1}`);
     check('blur: served or gracefully absent', blurRes.status === (sharpOk ? 200 : 404), `got ${blurRes.status}`);
-    if (sharpOk) check('blur: is jpeg', (blurRes.headers.get('content-type') || '').includes('jpeg'));
+    if (sharpOk) check('blur: is webp', (blurRes.headers.get('content-type') || '').includes('webp'));
     const blurMissing = await fetch(`${BASE}/media/blur?hash=deadbeef`);
     check('blur: missing → 404', blurMissing.status === 404);
 
@@ -183,15 +183,15 @@ async function main() {
       const bigHash = (await storage.store(Readable.from(big), { filename: 'big.png', takenAt: 0 })).hash;
 
       const t512 = await fetch(`${BASE}/media/thumb?hash=${bigHash}&w=512`);
-      check('thumb: w=512 → 200 jpeg', t512.status === 200 && t512.headers.get('content-type') === 'image/jpeg',
+      check('thumb: w=512 → 200 webp', t512.status === 200 && t512.headers.get('content-type') === 'image/webp',
         t512.headers.get('content-type'));
-      check('thumb: 512 variant cached on disk', fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t512.jpg`)));
+      check('thumb: 512 variant cached on disk', fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t512.webp`)));
       await fetch(`${BASE}/media/thumb?hash=${bigHash}&w=256`);
-      check('thumb: 256 variant cached separately', fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t256.jpg`)));
+      check('thumb: 256 variant cached separately', fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t256.webp`)));
       // An out-of-range width is snapped to the largest allowlisted size, not honoured verbatim.
       await fetch(`${BASE}/media/thumb?hash=${bigHash}&w=99999`);
       check('thumb: oversized w snapped (no arbitrary-size file)',
-        !fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t99999.jpg`)));
+        !fs.existsSync(path.join(dir, '.thumbs', `${bigHash}-t99999.webp`)));
 
       // Drop the throwaway image so later count assertions see the original 3.
       await storage.remove(bigHash);
@@ -201,15 +201,15 @@ async function main() {
     }
 
     // ---- full-screen viewer source (/media/view) -------------------------
-    // With sharp, the viewer gets an inside-fit JPEG sized to `w` (snapped to an
+    // With sharp, the viewer gets an inside-fit WebP sized to `w` (snapped to an
     // allowlisted size) instead of the full-resolution original — the responsive
     // win. Without sharp it falls back to streaming the untouched original.
     const viewPng = await fetch(`${BASE}/media/view?hash=${h1}&w=1024`);
     check('view: web-safe image → 200', viewPng.status === 200, `got ${viewPng.status}`);
     if (sharpOk) {
-      check('view: web-safe downsized to jpeg', viewPng.headers.get('content-type') === 'image/jpeg',
+      check('view: web-safe downsized to webp', viewPng.headers.get('content-type') === 'image/webp',
         viewPng.headers.get('content-type'));
-      check('view: 1024 variant cached on disk', fs.existsSync(path.join(dir, '.thumbs', `${h1}-v1024.jpg`)));
+      check('view: 1024 variant cached on disk', fs.existsSync(path.join(dir, '.thumbs', `${h1}-v1024.webp`)));
     } else {
       check('view: web-safe served as original type', viewPng.headers.get('content-type') === 'image/png',
         viewPng.headers.get('content-type'));
@@ -218,7 +218,7 @@ async function main() {
         viewPngBytes.equals(Buffer.concat([PNG_1x1, Buffer.from('1')])));
     }
 
-    // A format the browser can't render (TIFF) is converted to JPEG so the
+    // A format the browser can't render (TIFF) is converted to WebP so the
     // lightbox can display it — the bug this endpoint fixes.
     if (sharpOk) {
       const sharp = require('sharp');
@@ -228,10 +228,10 @@ async function main() {
       const tiffHash = (await storage.store(Readable.from(tiff), { filename: 'heirloom.tiff', takenAt: 0 })).hash;
       const viewTiff = await fetch(`${BASE}/media/view?hash=${tiffHash}&w=2048`);
       check('view: non-web image → 200', viewTiff.status === 200, `got ${viewTiff.status}`);
-      check('view: non-web image converted to jpeg',
-        viewTiff.headers.get('content-type') === 'image/jpeg', viewTiff.headers.get('content-type'));
+      check('view: non-web image converted to webp',
+        viewTiff.headers.get('content-type') === 'image/webp', viewTiff.headers.get('content-type'));
       check('view: converted copy is cached on disk',
-        fs.existsSync(path.join(dir, '.thumbs', `${tiffHash}-v2048.jpg`)));
+        fs.existsSync(path.join(dir, '.thumbs', `${tiffHash}-v2048.webp`)));
       // Drop the throwaway TIFF so later count assertions see the original 3.
       await storage.remove(tiffHash);
       await thumbnailer.forget(tiffHash);

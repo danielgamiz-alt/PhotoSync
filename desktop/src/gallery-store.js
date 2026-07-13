@@ -51,19 +51,19 @@ class Thumbnailer {
   }
 
   _thumbPath(hash, size) {
-    return path.join(this.getRoot(), THUMB_DIR, `${hash}-t${size}.jpg`);
+    return path.join(this.getRoot(), THUMB_DIR, `${hash}-t${size}.webp`);
   }
 
   _blurPath(hash) {
-    return path.join(this.getRoot(), THUMB_DIR, `${hash}-b.jpg`);
+    return path.join(this.getRoot(), THUMB_DIR, `${hash}-b.webp`);
   }
 
   _viewPath(hash, size) {
-    return path.join(this.getRoot(), THUMB_DIR, `${hash}-v${size}.jpg`);
+    return path.join(this.getRoot(), THUMB_DIR, `${hash}-v${size}.webp`);
   }
 
   /**
-   * Returns a path to an inside-fit, browser-displayable JPEG for the
+   * Returns a path to an inside-fit, browser-displayable WebP for the
    * full-screen viewer at (the nearest allowlisted size to) `size` px on the
    * longest edge, generating it on first request and caching it beside the
    * thumbnails. This both downsizes big originals to a viewport-appropriate copy
@@ -81,7 +81,7 @@ class Thumbnailer {
       await sharp(absSource)
         .rotate() // honour EXIF orientation
         .resize(s, s, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 82 })
+        .webp({ quality: 80 })
         .toFile(out);
       return out;
     } catch {
@@ -93,7 +93,7 @@ class Thumbnailer {
   }
 
   /**
-   * Returns the path to a cached square (cover-cropped) JPEG thumbnail for an
+   * Returns the path to a cached square (cover-cropped) WebP thumbnail for an
    * image at (the nearest allowlisted size to) `size` px, generating it on first
    * request. Returns null when thumbnails aren't possible (no sharp, a video, or
    * a decode failure) so the caller can serve the original instead.
@@ -108,7 +108,7 @@ class Thumbnailer {
       await sharp(absSource)
         .rotate() // honour EXIF orientation
         .resize(s, s, { fit: 'cover', position: 'attention' })
-        .jpeg({ quality: s <= 256 ? 72 : 76 })
+        .webp({ quality: s <= 256 ? 72 : 76 })
         .toFile(out);
       return out;
     } catch {
@@ -120,7 +120,7 @@ class Thumbnailer {
   }
 
   /**
-   * Returns the path to a cached tiny blur JPEG for an image, generating it on
+   * Returns the path to a cached tiny blur WebP for an image, generating it on
    * first request. Served by the gallery as an instant, browser-cacheable
    * placeholder while the full thumbnail loads. Returns null when a blur isn't
    * possible (no sharp, a video, or a decode failure).
@@ -134,7 +134,7 @@ class Thumbnailer {
       await sharp(absSource)
         .rotate() // honour EXIF orientation
         .resize(BLUR_SIZE, BLUR_SIZE, { fit: 'cover' })
-        .jpeg({ quality: 40 })
+        .webp({ quality: 40 })
         .toFile(out);
       return out;
     } catch {
@@ -159,9 +159,15 @@ class Thumbnailer {
       while (i < imageItems.length && !this._warmupAbort) {
         const m = imageItems[i++];
         const abs = path.join(root, m.path);
-        // Warm only the grid's 1× baseline + blur; larger variants are cheap to
-        // make on demand and warming them all would bloat the cache upfront.
-        await this.thumb(m.hash, abs, 'image', DEFAULT_THUMB);
+        // Warm every grid variant (256 for 1×, 512 for retina) + blur so the
+        // first scroll never waits on an on-demand encode. The larger VIEW_SIZES
+        // stay on-demand: the lightbox opens one image at a time (cheap to make
+        // then) and pre-rendering 2048px copies for the whole library would
+        // bloat the cache upfront.
+        for (const size of THUMB_SIZES) {
+          if (this._warmupAbort) break;
+          await this.thumb(m.hash, abs, 'image', size);
+        }
         await this.blurFile(m.hash, abs, 'image');
       }
     };
@@ -184,6 +190,11 @@ class Thumbnailer {
       // Legacy fixed-size cache files from before responsive variants.
       path.join(dir, `${hash}.jpg`),
       path.join(dir, `${hash}-view.jpg`),
+      // Legacy JPEG derivatives from before the WebP switch (same naming,
+      // different extension) — clean them up so we don't leave orphans behind.
+      ...THUMB_SIZES.map((s) => path.join(dir, `${hash}-t${s}.jpg`)),
+      ...VIEW_SIZES.map((s) => path.join(dir, `${hash}-v${s}.jpg`)),
+      path.join(dir, `${hash}-b.jpg`),
     ];
     await Promise.all(files.map((f) => fsp.unlink(f).catch(() => {})));
   }
