@@ -61,8 +61,10 @@
     <!-- ================= PHOTOS ================= -->
     <section id="galleryView">
       <div id="galleryBar" class="gallery-bar hidden">
-        <span class="muted small">Showing</span>
-        <select id="accountSelect" class="acct-select"></select>
+        <span id="acctPicker" class="acct-picker hidden">
+          <span class="muted small">Showing</span>
+          <select id="accountSelect" class="acct-select"></select>
+        </span>
         <div class="gallery-bar-spacer"></div>
         <button id="reindexBtn" class="btn btn-ghost btn-sm" title="Scan the storage folder for photos copied there manually">Scan for new files</button>
       </div>

@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "node test/smoke-test.js",
+    "test": "node test/reindex-test.js && node test/smoke-test.js",
     "stamp-version": "node ../scripts/stamp-version.js"
   },
   "engines": {

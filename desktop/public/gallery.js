@@ -15,6 +15,10 @@
   let lastClickedIndex = null;
   let lightboxIndex = -1;
   let activeTab = 'photos';
+  let lastRev = -1; // library revision last rendered; poll re-fetches only on change
+  let groups = []; // date sections: { key, label, items:[global media index...] }
+  let cols = 1; // tiles per row at the current width (recomputed on render/resize)
+  let tileH = 0; // square tile height in px, used to reserve section heights
 
   // 'default' is the no-account folder (e.g. older uploads) — show it as "Me".
   const accountLabel = (name) => (name === 'default' ? 'Me' : name);
@@ -60,6 +64,23 @@
         ? { weekday: 'short', day: 'numeric', month: 'short' }
         : { day: 'numeric', month: 'short', year: 'numeric' }
     );
+  }
+  // Section grouping respects how confident we are about a photo's date:
+  //   exact → its own day        ("Yesterday", "4 Mar")
+  //   year  → one section per year, dateless ("2025 · Undated") — for photos
+  //           the owner filed under a bare YYYY/ folder with no real metadata
+  //   none  → a single "Undated" section at the bottom
+  function groupKey(m) {
+    const p = m.datePrecision || 'exact';
+    if (p === 'exact' && m.takenAt) return 'd-' + dayKey(m.takenAt);
+    if (p === 'year' && m.takenAt) return 'y-' + new Date(m.takenAt).getFullYear();
+    return 'undated';
+  }
+  function groupLabel(m) {
+    const p = m.datePrecision || 'exact';
+    if (p === 'exact' && m.takenAt) return dayLabel(m.takenAt);
+    if (p === 'year' && m.takenAt) return new Date(m.takenAt).getFullYear() + ' · Undated';
+    return 'Undated';
   }
   const escapeHtml = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -109,17 +130,23 @@
     for (const h of [...selected]) {
       if (!media.some((m) => m.hash === h)) selected.delete(h);
     }
+    if (typeof data.rev === 'number') lastRev = data.rev;
+    // Now that we've reached the app, reveal the bar so "Scan for new files"
+    // is always available (the account dropdown inside it is shown separately).
+    $('galleryBar').classList.remove('hidden');
     renderAccountSelector();
     renderGallery();
     updateSelBar();
   }
 
   function renderAccountSelector() {
-    const bar = $('galleryBar');
     const sel = $('accountSelect');
-    // Only worth showing once there's more than one account to choose between.
+    // The account dropdown is only worth showing once there's more than one
+    // account to choose between. The bar itself (and its "Scan for new files"
+    // button) stays visible regardless — see loadMedia — so you can always
+    // import folders even when the library still has a single account.
     const multi = accounts.length > 1;
-    bar.classList.toggle('hidden', !multi);
+    $('acctPicker').classList.toggle('hidden', !multi);
     if (!multi) return;
 
     const total = accounts.reduce((n, a) => n + a.count, 0);
@@ -147,43 +174,53 @@
     const root = $('gallery');
     if (media.length === 0) {
       root.innerHTML = '';
+      groups = [];
       return;
     }
 
-    const groups = [];
+    groups = [];
     let cur = null;
     media.forEach((m, i) => {
-      const k = dayKey(m.takenAt);
+      const k = groupKey(m);
       if (!cur || cur.key !== k) {
-        cur = { key: k, label: dayLabel(m.takenAt), items: [] };
+        cur = { key: k, label: groupLabel(m), items: [] };
         groups.push(cur);
       }
       cur.items.push(i);
     });
 
+    // Render only the section shells (header + an empty, height-reserved grid).
+    // Each section's tiles are mounted on demand as it nears the viewport — with
+    // tens of thousands of photos, keeping every tile in the DOM made scrolling
+    // and jump-to-middle slow. Reserving the exact grid height up front keeps
+    // the scrollbar and scroll position stable whether or not tiles are mounted.
+    // See computeLayout / reserveHeights / observeSections.
     root.innerHTML = groups
       .map(
-        (g) => `<div class="day" data-daykey="${g.key}">
+        (g, gi) => `<div class="day" data-gi="${gi}" data-daykey="${g.key}">
           <div class="day-header">
             <div class="day-check" role="button" title="Select all" aria-label="Select all photos from ${escapeHtml(g.label)}">✓</div>
             <span class="day-title">${escapeHtml(g.label)}</span>
             <span class="day-count">${g.items.length}</span>
           </div>
-          <div class="day-grid">${g.items.map(renderTile).join('')}</div>
+          <div class="day-grid" data-gi="${gi}"></div>
         </div>`
       )
       .join('');
+
+    computeLayout();
+    reserveHeights();
+    observeSections();
     applySelectionClasses();
-    setupLazyLoad();
   }
 
   function renderTile(i) {
     const m = media[i];
-    // Media carries `data-src` (and `data-blur`) only — nothing is fetched until
-    // the tile nears the viewport (see setupLazyLoad). With a big library this is
-    // the difference between thousands of immediate requests and just the few
-    // around the scroll position. On intersect the tiny blur loads first as an
-    // instant placeholder, then the full thumbnail sharpens in over it.
+    // Media carries `data-src`/`data-srcset` (and `data-blur`) only — nothing is
+    // fetched until the tile nears the viewport (see the tileObserver). Combined
+    // with section mounting, only the few tiles around the scroll position exist
+    // and load at any time. On intersect the tiny blur loads first as an instant
+    // placeholder, then the full responsive thumbnail sharpens in over it.
     if (m.type === 'video') {
       return `<div class="tile video-tile" data-index="${i}" data-hash="${m.hash}">
         <video muted data-src="/media/file?hash=${m.hash}#t=0.1"></video>
@@ -194,8 +231,15 @@
     // Blur placeholders come from a dedicated endpoint (browser-cached) rather
     // than inline data URIs, so the /api/media poll stays small on big libraries.
     const blurAttr = thumbsAvailable ? ` data-blur="/media/blur?hash=${m.hash}"` : '';
+    // Responsive grid thumbnail: the browser picks 256w (1×) or 512w (2×/retina)
+    // from the tile's CSS width (`sizes`). Both srcset and src stay in data-*
+    // attributes until the tile nears the viewport (see the lazy loader), so
+    // idle tiles fetch nothing. `sizes` is a plain attribute and is kept in sync
+    // with the measured tile width on resize (see the resize handler).
+    const base = `/media/thumb?hash=${m.hash}`;
+    const srcset = `${base}&amp;w=256 256w, ${base}&amp;w=512 512w`;
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
-      <img${blurAttr} data-src="/media/thumb?hash=${m.hash}" alt="">
+      <img${blurAttr} data-src="${base}&amp;w=256" data-srcset="${srcset}" sizes="${tileH || 256}px" alt="">
       <div class="tile-check">✓</div>
     </div>`;
   }
@@ -254,6 +298,9 @@
     img._releaseThumb = release;
     img.addEventListener('load', onSettle);
     img.addEventListener('error', onSettle);
+    // Set srcset first so the browser resolves the responsive candidate against
+    // `sizes` when src is assigned, then src as the no-srcset fallback.
+    if (img.dataset.srcset) img.setAttribute('srcset', img.dataset.srcset);
     img.setAttribute('src', src);
   }
   function enqueueThumb(img, src) {
@@ -264,6 +311,7 @@
     drainThumbQueue();
   }
   let tileObserver = null;
+  let sectionObserver = null;
   function loadTileMedia(el) {
     const src = el.dataset.src;
     if (!src || el.getAttribute('src') === src) return;
@@ -294,6 +342,9 @@
     // below won't reliably fire load/error, so we must release it ourselves.
     el._thumbQueued = false;
     if (el._releaseThumb) el._releaseThumb();
+    // Drop the responsive candidates too so the blur/empty state actually shows
+    // (a lingering srcset would otherwise keep the real thumbnail painted).
+    el.removeAttribute('srcset');
     // Restore blur placeholder if one exists, otherwise clear src.
     el.classList.remove('thumb-loaded');
     if (blurSrc) {
@@ -303,8 +354,8 @@
       el.removeAttribute('src');
     }
   }
-  function setupLazyLoad() {
-    if (tileObserver) tileObserver.disconnect();
+  function ensureTileObserver() {
+    if (tileObserver) return;
     tileObserver = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -314,10 +365,94 @@
           else unloadTileMedia(el);
         }
       },
-      { rootMargin: '2000px 0px' }
+      { rootMargin: '1000px 0px' }
     );
-    document.querySelectorAll('#gallery .tile').forEach((t) => tileObserver.observe(t));
   }
+
+  // ---- windowed section rendering ------------------------------------------
+  // Tiles are uniform squares, so each section's pixel height is known from its
+  // photo count without laying the tiles out. We reserve that height, then
+  // mount/unmount each section's tiles as it enters/leaves an expanded viewport.
+  const GRID_GAP = 4;   // must match .day-grid `gap` in gallery.css
+  const MIN_TILE = 160; // must match .day-grid minmax(160px, …) in gallery.css
+
+  function computeLayout() {
+    const grid = $('gallery').querySelector('.day-grid');
+    const w = (grid ? grid.clientWidth : $('gallery').clientWidth) || 0;
+    if (w < MIN_TILE) { cols = 1; tileH = MIN_TILE; return; } // hidden/too-narrow fallback
+    cols = Math.max(1, Math.floor((w + GRID_GAP) / (MIN_TILE + GRID_GAP)));
+    tileH = Math.max(1, Math.round((w - (cols - 1) * GRID_GAP) / cols)); // square tiles
+  }
+
+  function sectionHeight(count) {
+    const rows = Math.ceil(count / cols);
+    return rows > 0 ? rows * tileH + (rows - 1) * GRID_GAP : 0;
+  }
+
+  function reserveHeights() {
+    $('gallery').querySelectorAll('.day-grid').forEach((grid) => {
+      const g = groups[+grid.dataset.gi];
+      if (g) grid.style.minHeight = sectionHeight(g.items.length) + 'px';
+    });
+  }
+
+  function mountSection(grid) {
+    if (grid.dataset.mounted || !groups[+grid.dataset.gi]) return;
+    const g = groups[+grid.dataset.gi];
+    grid.innerHTML = g.items.map(renderTile).join('');
+    grid.dataset.mounted = '1';
+    ensureTileObserver();
+    grid.querySelectorAll('.tile').forEach((t) => {
+      t.classList.toggle('selected', selected.has(t.dataset.hash));
+      tileObserver.observe(t);
+    });
+  }
+
+  function unmountSection(grid) {
+    if (!grid.dataset.mounted) return;
+    grid.querySelectorAll('.tile').forEach((t) => {
+      if (tileObserver) tileObserver.unobserve(t);
+      const el = t.querySelector('img, video');
+      if (el) unloadTileMedia(el);
+    });
+    grid.innerHTML = '';
+    delete grid.dataset.mounted;
+  }
+
+  function observeSections() {
+    ensureTileObserver();
+    tileObserver.disconnect(); // drop any stale tile observations from a prior render
+    if (sectionObserver) sectionObserver.disconnect();
+    sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) mountSection(e.target);
+          else unmountSection(e.target);
+        }
+      },
+      { rootMargin: '1400px 0px' }
+    );
+    $('gallery').querySelectorAll('.day-grid').forEach((grid) => sectionObserver.observe(grid));
+  }
+
+  // Re-measure on width changes: recompute geometry, re-reserve heights (mounted
+  // sections' real tiles reflow via CSS grid to match).
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (groups.length === 0) return;
+      computeLayout();
+      reserveHeights();
+      // Tiles stay mounted across a resize, so update their `sizes` to the new
+      // tile width — the browser then re-picks the right srcset candidate.
+      if (tileH > 0) {
+        document
+          .querySelectorAll('#gallery .tile img[data-srcset]')
+          .forEach((img) => { img.sizes = tileH + 'px'; });
+      }
+    }, 150);
+  });
 
   // ---- selection -----------------------------------------------------------
   function toggleOne(hash) {
@@ -328,8 +463,12 @@
     const [lo, hi] = a < b ? [a, b] : [b, a];
     for (let i = lo; i <= hi; i++) selected.add(media[i].hash);
   }
+  // Works off the group's item list, not the DOM, so "select all" is correct
+  // even when the section's tiles aren't currently mounted.
   function toggleDay(dayEl) {
-    const hashes = [...dayEl.querySelectorAll('.tile')].map((t) => t.dataset.hash);
+    const g = groups[+dayEl.dataset.gi];
+    if (!g) return;
+    const hashes = g.items.map((i) => media[i].hash);
     const allSelected = hashes.length > 0 && hashes.every((h) => selected.has(h));
     hashes.forEach((h) => (allSelected ? selected.delete(h) : selected.add(h)));
   }
@@ -339,8 +478,8 @@
       t.classList.toggle('selected', selected.has(t.dataset.hash));
     });
     document.querySelectorAll('#gallery .day').forEach((day) => {
-      const tiles = [...day.querySelectorAll('.tile')];
-      const all = tiles.length > 0 && tiles.every((t) => selected.has(t.dataset.hash));
+      const g = groups[+day.dataset.gi];
+      const all = g && g.items.length > 0 && g.items.every((i) => selected.has(media[i].hash));
       day.classList.toggle('day-selected', all);
     });
   }
@@ -414,13 +553,20 @@
     $('lbStage').innerHTML = ''; // stop video playback
     lightboxIndex = -1;
   }
+  // Longest screen edge × DPR, so the viewer fetches a copy sized to this
+  // display rather than the full-resolution original. The server snaps this to
+  // the nearest allowlisted variant (1024 for laptops, 2048 for 4K/retina).
+  function viewWidth() {
+    const edge = Math.max(window.innerWidth, window.innerHeight);
+    return Math.ceil(edge * (window.devicePixelRatio || 1));
+  }
   function renderLightbox() {
     const m = media[lightboxIndex];
     if (!m) return;
     $('lbStage').innerHTML =
       m.type === 'video'
         ? `<video src="/media/file?hash=${m.hash}" controls autoplay></video>`
-        : `<img src="/media/file?hash=${m.hash}" alt="">`;
+        : `<img src="/media/view?hash=${m.hash}&w=${viewWidth()}" alt="">`;
   }
   function navLightbox(delta) {
     const n = media.length;
@@ -554,10 +700,18 @@
   window.reloadGallery = () => loadMedia();
 
   // ---- polling -------------------------------------------------------------
+  // Poll a tiny version counter, not the whole media list. With tens of
+  // thousands of photos the list is multiple MB; re-fetching and re-parsing it
+  // every few seconds was pure waste when nothing had changed. Only pull the
+  // full list when the library's revision actually moved (upload, scan, delete).
   loadMedia();
-  setInterval(() => {
-    if (activeTab === 'photos' && selected.size === 0 && $('lightbox').classList.contains('hidden')) {
-      loadMedia();
+  setInterval(async () => {
+    if (activeTab !== 'photos' || selected.size > 0 || !$('lightbox').classList.contains('hidden')) return;
+    try {
+      const { rev } = await fetch('/api/media/version').then((r) => r.json());
+      if (typeof rev === 'number' && rev !== lastRev) loadMedia();
+    } catch {
+      /* disconnected — app.js shows the banner; nothing to refresh */
     }
   }, 8000);
 })();

@@ -80,14 +80,24 @@ async function route(req, res, deps) {
     const account = url.searchParams.get('account') || '';
     const items = account && account !== 'all' ? all.filter((m) => m.user === account) : all;
 
-    return sendJson(res, 200, { items, accounts, thumbnails: deps.thumbnailer.available });
+    return sendJson(res, 200, { items, accounts, thumbnails: deps.thumbnailer.available, rev: storage.rev });
+  }
+
+  // A tiny liveness/version probe so the gallery can poll cheaply and only
+  // re-fetch the (multi-MB) media list when the library actually changed.
+  if (p === '/api/media/version' && req.method === 'GET') {
+    const storage = deps.getStorage();
+    return sendJson(res, 200, { rev: storage ? storage.rev : 0, count: storage ? storage.count() : 0 });
   }
 
   if (p === '/media/thumb' && req.method === 'GET') {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });
     const type = mimeFor(entry.path).startsWith('video') ? 'video' : 'image';
-    const thumb = await deps.thumbnailer.thumb(entry.hash, entry.abs, type);
+    // `w` picks the responsive variant (snapped to an allowlisted size); the
+    // grid sends 256/512 for 1×/2× tiles. Omitted → the default baseline.
+    const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
+    const thumb = await deps.thumbnailer.thumb(entry.hash, entry.abs, type, w);
     if (thumb) return serveFile(req, res, thumb, 'image/jpeg');
     return serveFile(req, res, entry.abs, mimeFor(entry.path)); // fallback: original
   }
@@ -105,6 +115,26 @@ async function route(req, res, deps) {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });
     return serveFile(req, res, entry.abs, mimeFor(entry.path));
+  }
+
+  // Full-screen viewer source. Videos stream straight from disk. Images are
+  // served as an inside-fit JPEG sized to the viewport (`w` = longest screen
+  // edge × DPR, snapped to an allowlisted size) — so a fit-to-window lightbox
+  // no longer downloads a 40MP original, and formats the browser can't decode
+  // (HEIC/TIFF/BMP…) still open because they're converted in the same step.
+  // Falls back to the original bytes if resizing isn't possible (e.g. sharp
+  // missing) so nothing ever fails to display.
+  if (p === '/media/view' && req.method === 'GET') {
+    const entry = entryFor(deps, url.searchParams.get('hash'));
+    if (!entry) return sendJson(res, 404, { error: 'not found' });
+    const mime = mimeFor(entry.path);
+    if (mime.startsWith('video')) {
+      return serveFile(req, res, entry.abs, mime);
+    }
+    const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
+    const jpeg = await deps.thumbnailer.view(entry.hash, entry.abs, 'image', w);
+    if (jpeg) return serveFile(req, res, jpeg, 'image/jpeg');
+    return serveFile(req, res, entry.abs, mime); // sharp missing / decode failed
   }
 
   if (p === '/api/media/reveal' && req.method === 'POST') {
@@ -269,7 +299,10 @@ function serveFile(req, res, absPath, mime) {
   const headers = {
     'content-type': mime,
     'accept-ranges': 'bytes',
-    'cache-control': 'private, max-age=300',
+    // Media URLs are addressed by content hash (or a stable trash id), so the
+    // bytes never change — let the browser keep them for good and skip the
+    // constant thumbnail re-downloads when scrolling back over the library.
+    'cache-control': 'private, max-age=31536000, immutable',
   };
 
   const range = req.headers.range;

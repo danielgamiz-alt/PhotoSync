@@ -14,9 +14,29 @@ try {
 }
 
 const THUMB_DIR = '.thumbs';
-const THUMB_SIZE = 400;
 const BLUR_SIZE = 12;
 const WARM_CONCURRENCY = 3;
+
+// Allowlisted variant sizes (longest edge, in CSS px × DPR terms). Requests are
+// snapped to the nearest of these so the on-disk cache stays bounded and a
+// caller can't ask us to render arbitrary sizes. This is the server side of the
+// responsive-images story: each surface (grid tile, retina grid, laptop
+// lightbox, 4K lightbox) fetches the smallest variant that still looks sharp,
+// exactly like Google Photos' `=w400` / `=w2048` URL suffixes.
+//   THUMB_SIZES → square, cover-cropped — the gallery grid (art-direction crop)
+//   VIEW_SIZES  → inside-fit, full aspect — the full-screen viewer
+const THUMB_SIZES = [256, 512];
+const VIEW_SIZES = [1024, 2048];
+const DEFAULT_THUMB = THUMB_SIZES[0]; // warmed up ahead of time; grid 1× baseline
+const DEFAULT_VIEW = VIEW_SIZES[VIEW_SIZES.length - 1];
+
+// Smallest allowlisted size that still covers `want`; falls back to the largest.
+function snapSize(sizes, want) {
+  const n = Number(want);
+  if (!Number.isFinite(n)) return sizes[0];
+  for (const s of sizes) if (s >= n) return s;
+  return sizes[sizes.length - 1];
+}
 
 class Thumbnailer {
   /** getRoot() returns the current storage root (changes when the user
@@ -30,32 +50,71 @@ class Thumbnailer {
     return sharp !== null;
   }
 
-  _thumbPath(hash) {
-    return path.join(this.getRoot(), THUMB_DIR, `${hash}.jpg`);
+  _thumbPath(hash, size) {
+    return path.join(this.getRoot(), THUMB_DIR, `${hash}-t${size}.jpg`);
   }
 
   _blurPath(hash) {
     return path.join(this.getRoot(), THUMB_DIR, `${hash}-b.jpg`);
   }
 
+  _viewPath(hash, size) {
+    return path.join(this.getRoot(), THUMB_DIR, `${hash}-v${size}.jpg`);
+  }
+
   /**
-   * Returns the path to a cached JPEG thumbnail for an image, generating it on
-   * first request. Returns null when thumbnails aren't possible (no sharp, a
-   * video, or a decode failure) so the caller can serve the original instead.
+   * Returns a path to an inside-fit, browser-displayable JPEG for the
+   * full-screen viewer at (the nearest allowlisted size to) `size` px on the
+   * longest edge, generating it on first request and caching it beside the
+   * thumbnails. This both downsizes big originals to a viewport-appropriate copy
+   * AND converts formats the browser can't render natively (HEIC/HEIF/TIFF/BMP…).
+   * Returns null when a conversion isn't possible (no sharp, a video, or a decode
+   * failure) so the caller can fall back to serving the original bytes.
    */
-  async thumb(hash, absSource, type) {
+  async view(hash, absSource, type, size = DEFAULT_VIEW) {
     if (!sharp || type === 'video') return null;
-    const out = this._thumbPath(hash);
+    const s = snapSize(VIEW_SIZES, size);
+    const out = this._viewPath(hash, s);
     try {
       if (fs.existsSync(out)) return out;
       await fsp.mkdir(path.dirname(out), { recursive: true });
       await sharp(absSource)
         .rotate() // honour EXIF orientation
-        .resize(THUMB_SIZE, THUMB_SIZE, { fit: 'cover', position: 'attention' })
-        .jpeg({ quality: 72 })
+        .resize(s, s, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82 })
         .toFile(out);
       return out;
     } catch {
+      // toFile may have left a partial/garbage file — drop it so a failed
+      // generation isn't cached and re-served forever on the next request.
+      await fsp.unlink(out).catch(() => {});
+      return null;
+    }
+  }
+
+  /**
+   * Returns the path to a cached square (cover-cropped) JPEG thumbnail for an
+   * image at (the nearest allowlisted size to) `size` px, generating it on first
+   * request. Returns null when thumbnails aren't possible (no sharp, a video, or
+   * a decode failure) so the caller can serve the original instead.
+   */
+  async thumb(hash, absSource, type, size = DEFAULT_THUMB) {
+    if (!sharp || type === 'video') return null;
+    const s = snapSize(THUMB_SIZES, size);
+    const out = this._thumbPath(hash, s);
+    try {
+      if (fs.existsSync(out)) return out;
+      await fsp.mkdir(path.dirname(out), { recursive: true });
+      await sharp(absSource)
+        .rotate() // honour EXIF orientation
+        .resize(s, s, { fit: 'cover', position: 'attention' })
+        .jpeg({ quality: s <= 256 ? 72 : 76 })
+        .toFile(out);
+      return out;
+    } catch {
+      // toFile may have left a partial/garbage file — drop it so a failed
+      // generation isn't cached and re-served forever on the next request.
+      await fsp.unlink(out).catch(() => {});
       return null;
     }
   }
@@ -100,7 +159,9 @@ class Thumbnailer {
       while (i < imageItems.length && !this._warmupAbort) {
         const m = imageItems[i++];
         const abs = path.join(root, m.path);
-        await this.thumb(m.hash, abs, 'image');
+        // Warm only the grid's 1× baseline + blur; larger variants are cheap to
+        // make on demand and warming them all would bloat the cache upfront.
+        await this.thumb(m.hash, abs, 'image', DEFAULT_THUMB);
         await this.blurFile(m.hash, abs, 'image');
       }
     };
@@ -115,8 +176,16 @@ class Thumbnailer {
   }
 
   async forget(hash) {
-    await fsp.unlink(this._thumbPath(hash)).catch(() => {});
-    await fsp.unlink(this._blurPath(hash)).catch(() => {});
+    const dir = path.join(this.getRoot(), THUMB_DIR);
+    const files = [
+      ...THUMB_SIZES.map((s) => this._thumbPath(hash, s)),
+      ...VIEW_SIZES.map((s) => this._viewPath(hash, s)),
+      this._blurPath(hash),
+      // Legacy fixed-size cache files from before responsive variants.
+      path.join(dir, `${hash}.jpg`),
+      path.join(dir, `${hash}-view.jpg`),
+    ];
+    await Promise.all(files.map((f) => fsp.unlink(f).catch(() => {})));
   }
 }
 
@@ -142,4 +211,11 @@ function mimeFor(name) {
   return MIME[path.extname(name).toLowerCase()] || 'application/octet-stream';
 }
 
-module.exports = { Thumbnailer, mimeFor, THUMB_DIR };
+// Image formats browsers render natively in an <img>. Anything else (HEIC,
+// HEIF, TIFF, BMP…) needs converting before the full-screen viewer can show it.
+const WEB_SAFE_IMAGE = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+function isWebSafeImage(name) {
+  return WEB_SAFE_IMAGE.has(path.extname(name).toLowerCase());
+}
+
+module.exports = { Thumbnailer, mimeFor, isWebSafeImage, THUMB_DIR, THUMB_SIZES, VIEW_SIZES };
