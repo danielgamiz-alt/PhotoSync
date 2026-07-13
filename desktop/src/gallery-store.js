@@ -81,7 +81,11 @@ class Thumbnailer {
       await sharp(absSource)
         .rotate() // honour EXIF orientation
         .resize(s, s, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 80 })
+        // effort:0 keeps this fast — the viewer image is generated on-demand
+        // when the lightbox opens, so encode latency is user-visible. At the
+        // default effort a 2048px WebP takes ~500ms; effort:0 brings it back to
+        // JPEG speed (~230ms) while still landing ~40% smaller than JPEG.
+        .webp({ quality: 80, effort: 0 })
         .toFile(out);
       return out;
     } catch {
