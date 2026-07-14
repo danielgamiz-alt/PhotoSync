@@ -274,13 +274,37 @@ async function main() {
       fs.writeFileSync(src, png);
       const out256 = path.join(wdir, 't256.webp');
       const out512 = path.join(wdir, 't512.webp');
-      const ok = await thumbnailer._renderViaWorker(src, [thumbnailer._thumbJob(out256, 256), thumbnailer._thumbJob(out512, 512)]);
+      const ok = await thumbnailer._renderHeic('workerjob', src, [thumbnailer._thumbJob(out256, 256), thumbnailer._thumbJob(out512, 512)], true);
       check('heic worker: render ok', ok === true, `got ${ok}`);
       check('heic worker: both variants from one decode', fs.existsSync(out256) && fs.existsSync(out512));
       const wmeta = fs.existsSync(out256) ? await sharp(out256).metadata() : {};
       check('heic worker: output is 256x256 webp', wmeta.format === 'webp' && wmeta.width === 256 && wmeta.height === 256,
         `${wmeta.format} ${wmeta.width}x${wmeta.height}`);
-      await thumbnailer.dispose(); // stop the worker
+
+      // Coalescing: two concurrent requests for the same source must share one
+      // queue entry (second one merges its job into the first).
+      const outA = path.join(wdir, 'co-a.webp');
+      const outB = path.join(wdir, 'co-b.webp');
+      const [okA, okB] = await Promise.all([
+        thumbnailer._renderHeic('co', src, [thumbnailer._thumbJob(outA, 256)], true),
+        thumbnailer._renderHeic('co', src, [thumbnailer._thumbJob(outB, 512)], true),
+      ]);
+      check('heic worker: coalesced requests both succeed', okA === true && okB === true, `${okA}/${okB}`);
+      check('heic worker: coalesced outputs both written', fs.existsSync(outA) && fs.existsSync(outB));
+
+      // A source that fails to decode entirely (garbage .heic): thumb() returns
+      // null and the endpoint must serve the fallback as no-store, so the
+      // browser retries later instead of caching the broken bytes for a year.
+      const { Readable } = require('stream');
+      const badHash = (await storage.store(Readable.from(Buffer.from('not a real heic file')), { filename: 'corrupt.heic', takenAt: 0 })).hash;
+      const badRes = await fetch(`${BASE}/media/thumb?hash=${badHash}&w=256`);
+      check('heic fallback: 200 original bytes', badRes.status === 200, `got ${badRes.status}`);
+      check('heic fallback: not browser-cached (no-store)', badRes.headers.get('cache-control') === 'no-store',
+        badRes.headers.get('cache-control'));
+      await storage.remove(badHash);
+      await thumbnailer.forget(badHash);
+
+      await thumbnailer.dispose(); // stop the worker pool
       try { fs.rmSync(wdir, { recursive: true, force: true }); } catch { /* handle may linger briefly on Windows */ }
     } else {
       console.log('  skip heic worker (sharp not installed)');

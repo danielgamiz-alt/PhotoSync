@@ -3,6 +3,7 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
+const os = require('os');
 const { Worker } = require('worker_threads');
 
 // Optional fast thumbnails. If `sharp` isn't installed, the gallery falls back
@@ -19,12 +20,25 @@ const BLUR_SIZE = 12;
 const WARM_CONCURRENCY = 3;
 
 // HEIC/HEIF can't be decoded by the prebuilt sharp/libheif (it lacks the HEVC
-// plugin for ~95% of real iPhone HEICs), so these are rendered in a worker
-// thread that uses the WASM decoder (heic-decode) with a sharp fallback. See
+// plugin for ~95% of real iPhone HEICs), so these are rendered in worker
+// threads that use the WASM decoder (heic-decode) with a sharp fallback. See
 // heic-decode-worker.js. Everything else stays on the fast in-process sharp path.
+//
+// The WASM decode costs ~1s of CPU per image, which shapes everything about how
+// jobs reach the workers (a naive serial queue starved the gallery — a screenful
+// of HEIC tiles held all six browser connections for tens of seconds and JPEG
+// tiles couldn't even fetch):
+//   - a small POOL of workers, so a scroll's worth of tiles decodes in parallel;
+//   - on-demand (gallery-visible) jobs take PRIORITY over background warmup;
+//   - requests for the same source COALESCE — one decode produces every missing
+//     derivative (blur + both grid sizes), instead of blur and thumb each paying
+//     for their own decode of the same photo.
 const HEIC_EXTS = new Set(['.heic', '.heif']);
 const HEIC_WORKER = path.join(__dirname, 'heic-decode-worker.js');
-const HEIC_JOB_TIMEOUT_MS = 60000; // WASM decode is slow; give a stuck file a hard cap
+const HEIC_JOB_TIMEOUT_MS = 30000; // per dispatched decode; a stuck file can't jam the pool
+// Each worker's WASM decode saturates one core; leave headroom for the main
+// thread (HTTP + in-process sharp) and the rest of the system.
+const HEIC_POOL_SIZE = Math.max(1, Math.min(3, os.cpus().length - 2));
 function isHeic(name) {
   return HEIC_EXTS.has(path.extname(name).toLowerCase());
 }
@@ -56,9 +70,10 @@ class Thumbnailer {
   constructor(getRoot) {
     this.getRoot = getRoot;
     this._warmupAbort = false;
-    this._worker = null;        // lazily-spawned HEIC decode worker thread
-    this._pending = new Map();  // in-flight HEIC job id -> resolve(ok)
-    this._jobId = 0;
+    this._heicPool = [];          // { worker, entry|null } wrappers, lazily spawned
+    this._heicQueue = [];         // entries waiting for a worker (urgent ones first)
+    this._heicPending = new Map(); // hash -> queued/running entry, for coalescing
+    this._lastUrgentAt = 0;       // when the gallery last asked for something
   }
 
   get available() {
@@ -112,7 +127,14 @@ class Thumbnailer {
     const s = snapSize(VIEW_SIZES, size);
     const out = this._viewPath(hash, s);
     if (fs.existsSync(out)) return out;
-    return (await this._render(absSource, [this._viewJob(out, s)])) ? out : null;
+    // For HEIC, piggyback the (missing) grid derivatives on the same decode —
+    // the decode dwarfs the extra encodes, and it saves a later decode when the
+    // user scrolls back to the grid.
+    const jobs = isHeic(absSource)
+      ? [this._viewJob(out, s), ...this._missingGridJobs(hash)]
+      : [this._viewJob(out, s)];
+    const ok = await this._render(hash, absSource, jobs, true);
+    return ok && fs.existsSync(out) ? out : null;
   }
 
   /**
@@ -126,7 +148,11 @@ class Thumbnailer {
     const s = snapSize(THUMB_SIZES, size);
     const out = this._thumbPath(hash, s);
     if (fs.existsSync(out)) return out;
-    return (await this._render(absSource, [this._thumbJob(out, s)])) ? out : null;
+    // HEIC: render every missing grid derivative from the one decode (the
+    // requested size is part of that set by construction).
+    const jobs = isHeic(absSource) ? this._missingGridJobs(hash) : [this._thumbJob(out, s)];
+    const ok = await this._render(hash, absSource, jobs, true);
+    return ok && fs.existsSync(out) ? out : null;
   }
 
   /**
@@ -139,81 +165,172 @@ class Thumbnailer {
     if (!sharp || type === 'video') return null;
     const out = this._blurPath(hash);
     if (fs.existsSync(out)) return out;
-    return (await this._render(absSource, [this._blurJob(out)])) ? out : null;
+    if (isHeic(absSource)) {
+      // Don't make the browser wait ~a second of WASM decode for a cosmetic
+      // placeholder — that pins one of its six connections per tile and starves
+      // every other tile's fetch. Answer "no blur yet" immediately and start the
+      // full render in the background; the tile's thumbnail request lands next
+      // and coalesces onto this in-flight decode.
+      this._render(hash, absSource, this._missingGridJobs(hash), true).catch(() => {});
+      return null;
+    }
+    const ok = await this._render(hash, absSource, [this._blurJob(out)], true);
+    return ok && fs.existsSync(out) ? out : null;
+  }
+
+  /** Every grid derivative (both thumb sizes + blur) still missing for `hash` —
+   *  the set one HEIC decode should produce in a single pass. */
+  _missingGridJobs(hash) {
+    const jobs = [];
+    for (const s of THUMB_SIZES) {
+      const out = this._thumbPath(hash, s);
+      if (!fs.existsSync(out)) jobs.push(this._thumbJob(out, s));
+    }
+    const blurOut = this._blurPath(hash);
+    if (!fs.existsSync(blurOut)) jobs.push(this._blurJob(blurOut));
+    return jobs;
   }
 
   /**
    * Render one or more WebP derivatives from a single source. HEIC/HEIF is
-   * routed to the WASM decode worker (the prebuilt sharp can't decode most of
-   * them); everything else is rendered in-process by sharp. Returns true only if
-   * every job's file was written. On any failure the partial outputs are removed
-   * so a bad render is never cached and re-served.
+   * routed to the WASM decode worker pool (the prebuilt sharp can't decode most
+   * of them); everything else is rendered in-process by sharp. `urgent` marks a
+   * gallery-visible request that must jump ahead of background warmup. Returns
+   * true only if every job's file was written; on failure the partial outputs
+   * are removed so a bad render is never cached and re-served.
    */
-  async _render(absSource, jobs) {
+  async _render(hash, absSource, jobs, urgent) {
     if (!jobs.length) return true;
+    if (urgent) this._lastUrgentAt = Date.now(); // warmup backs off while the gallery is active
     try {
       await fsp.mkdir(path.dirname(jobs[0].out), { recursive: true });
-      const ok = isHeic(absSource)
-        ? await this._renderViaWorker(absSource, jobs)
-        : await this._renderInProcess(absSource, jobs);
-      if (!ok) throw new Error('render failed');
-      return true;
+      if (!isHeic(absSource)) {
+        for (const job of jobs) {
+          await sharp(absSource).rotate().resize(job.resize).webp(job.webp).toFile(job.out);
+        }
+        return true;
+      }
+      return await this._renderHeic(hash, absSource, jobs, urgent);
     } catch {
       await Promise.all(jobs.map((j) => fsp.unlink(j.out).catch(() => {})));
       return false;
     }
   }
 
-  /** Non-HEIC: sharp decodes + encodes each job in-process. */
-  async _renderInProcess(absSource, jobs) {
-    for (const job of jobs) {
-      await sharp(absSource).rotate().resize(job.resize).webp(job.webp).toFile(job.out);
+  /**
+   * Queue a HEIC render on the worker pool. Concurrent requests for the same
+   * source coalesce: if a render for this hash is already queued its job list is
+   * merged (so blur + thumb for one tile share a single decode); if it's already
+   * running, we wait for it and only re-queue whatever is still missing after.
+   */
+  async _renderHeic(hash, absSource, jobs, urgent) {
+    const pending = this._heicPending.get(hash);
+    if (pending) {
+      if (!pending.dispatched) {
+        // Still waiting for a worker — merge our jobs into it (dedupe by output)
+        // and raise its priority if the gallery is now waiting on it.
+        const have = new Set(pending.jobs.map((j) => j.out));
+        for (const j of jobs) if (!have.has(j.out)) pending.jobs.push(j);
+        if (urgent && !pending.urgent) {
+          pending.urgent = true;
+          const i = this._heicQueue.indexOf(pending);
+          if (i >= 0) {
+            this._heicQueue.splice(i, 1);
+            this._heicQueue.splice(this._heicInsertPos(), 0, pending);
+          }
+        }
+        return pending.promise;
+      }
+      // Mid-decode — wait, then check what it produced for us.
+      await pending.promise;
+      jobs = jobs.filter((j) => !fs.existsSync(j.out));
+      if (!jobs.length) return true;
     }
-    return true;
+
+    const entry = { hash, src: absSource, jobs, urgent: !!urgent, dispatched: false, timer: null };
+    entry.promise = new Promise((resolve) => { entry.resolve = resolve; });
+    this._heicQueue.splice(entry.urgent ? this._heicInsertPos() : this._heicQueue.length, 0, entry);
+    this._heicPending.set(hash, entry);
+    this._heicPump();
+    return entry.promise;
   }
 
-  /** Lazily start (and keep) the HEIC decode worker thread. */
-  _heicWorker() {
-    if (this._worker) return this._worker;
-    const w = new Worker(HEIC_WORKER);
-    const failAll = () => {
-      // Worker crashed/exited — fail every in-flight job and drop it so the
-      // next HEIC render spawns a fresh one.
-      for (const resolve of this._pending.values()) resolve(false);
-      this._pending.clear();
-      if (this._worker === w) this._worker = null;
-    };
-    w.on('message', (m) => {
-      const resolve = this._pending.get(m.id);
-      if (resolve) { this._pending.delete(m.id); resolve(!!m.ok); }
+  /** Insertion point for an urgent entry: after other urgent ones, before warmup. */
+  _heicInsertPos() {
+    for (let i = 0; i < this._heicQueue.length; i++) {
+      if (!this._heicQueue[i].urgent) return i;
+    }
+    return this._heicQueue.length;
+  }
+
+  /** Feed queued entries to idle workers (spawning up to HEIC_POOL_SIZE). */
+  _heicPump() {
+    while (this._heicQueue.length) {
+      const slot = this._heicIdleSlot();
+      if (!slot) return;
+      const entry = this._heicQueue.shift();
+      entry.dispatched = true;
+      slot.entry = entry;
+      // The timeout starts at DISPATCH (not enqueue), so a deep queue can't
+      // time out jobs that were never given a chance to run.
+      entry.timer = setTimeout(() => this._heicKillSlot(slot), HEIC_JOB_TIMEOUT_MS);
+      slot.worker.postMessage({ id: entry.hash, src: entry.src, jobs: entry.jobs });
+    }
+  }
+
+  _heicIdleSlot() {
+    const idle = this._heicPool.find((s) => !s.entry);
+    if (idle) return idle;
+    if (this._heicPool.length >= HEIC_POOL_SIZE) return null;
+    const slot = { worker: new Worker(HEIC_WORKER), entry: null };
+    slot.worker.on('message', (m) => this._heicSettle(slot, !!m.ok));
+    slot.worker.on('error', () => this._heicKillSlot(slot));
+    slot.worker.on('exit', () => {
+      // Unexpected death (kill/terminate paths already removed the slot).
+      if (this._heicPool.includes(slot)) this._heicKillSlot(slot, { alreadyDead: true });
     });
-    w.on('error', failAll);
-    w.on('exit', () => { if (this._worker === w) failAll(); });
-    w.unref(); // the worker alone must not keep the process alive
-    this._worker = w;
-    return w;
+    slot.worker.unref(); // the pool alone must not keep the process alive
+    this._heicPool.push(slot);
+    return slot;
   }
 
-  /** HEIC/HEIF: hand the source + all jobs to the worker (one decode covers all). */
-  _renderViaWorker(absSource, jobs) {
-    return new Promise((resolve) => {
-      const id = ++this._jobId;
-      let settled = false;
-      const finish = (ok) => { if (settled) return; settled = true; this._pending.delete(id); resolve(ok); };
-      this._pending.set(id, finish);
-      // Hard cap so a stuck decode can't hang warmup forever.
-      setTimeout(() => finish(false), HEIC_JOB_TIMEOUT_MS);
-      this._heicWorker().postMessage({ id, src: absSource, jobs });
-    });
+  /** Complete the slot's current entry and hand the worker the next job. */
+  _heicSettle(slot, ok) {
+    const entry = slot.entry;
+    if (!entry) return;
+    slot.entry = null;
+    clearTimeout(entry.timer);
+    if (this._heicPending.get(entry.hash) === entry) this._heicPending.delete(entry.hash);
+    if (!ok) for (const j of entry.jobs) fsp.unlink(j.out).catch(() => {});
+    entry.resolve(ok);
+    this._heicPump();
   }
 
-  /** Stop the HEIC worker thread (e.g. on shutdown). Safe to call when idle. */
+  /** Tear down a wedged/crashed worker; its entry fails, the pool respawns lazily. */
+  _heicKillSlot(slot, { alreadyDead = false } = {}) {
+    const i = this._heicPool.indexOf(slot);
+    if (i >= 0) this._heicPool.splice(i, 1);
+    if (!alreadyDead) slot.worker.terminate().catch(() => {});
+    this._heicSettle(slot, false);
+  }
+
+  /** Stop all HEIC workers and fail anything queued (e.g. on shutdown). */
   async dispose() {
-    const w = this._worker;
-    this._worker = null;
-    for (const resolve of this._pending.values()) resolve(false);
-    this._pending.clear();
-    if (w) await w.terminate().catch(() => {});
+    const queued = this._heicQueue.splice(0);
+    for (const e of queued) {
+      if (this._heicPending.get(e.hash) === e) this._heicPending.delete(e.hash);
+      e.resolve(false);
+    }
+    const pool = this._heicPool.splice(0);
+    for (const slot of pool) {
+      if (slot.entry) {
+        clearTimeout(slot.entry.timer);
+        if (this._heicPending.get(slot.entry.hash) === slot.entry) this._heicPending.delete(slot.entry.hash);
+        slot.entry.resolve(false);
+        slot.entry = null;
+      }
+    }
+    await Promise.all(pool.map((s) => s.worker.terminate().catch(() => {})));
   }
 
   /**
@@ -229,11 +346,25 @@ class Thumbnailer {
     if (!sharp) return;
     this._warmupAbort = false;
     const root = this.getRoot();
-    const imageItems = items.filter((m) => m.type !== 'video');
+    // Cheap-to-decode formats first: the JPEG bulk of the library warms at
+    // ~100ms/image, while each HEIC costs ~1s of WASM decode — front-loading
+    // JPEGs gets most of the grid covered quickly and leaves the slow HEIC tail
+    // for later (on-demand requests preempt it via the urgent queue anyway).
+    const imageItems = items
+      .filter((m) => m.type !== 'video')
+      .sort((a, b) => Number(isHeic(a.path)) - Number(isHeic(b.path)));
 
     let i = 0;
     const worker = async () => {
       while (i < imageItems.length && !this._warmupAbort) {
+        // Yield to the user: while the gallery is actively requesting tiles
+        // (scrolling, first paint), warming full-speed on 3 workers competes
+        // with those on-demand renders for the same cores and visibly slows the
+        // grid. Idle-wait until the gallery has been quiet for a moment.
+        while (!this._warmupAbort && Date.now() - this._lastUrgentAt < 1500) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        if (this._warmupAbort) return;
         const m = imageItems[i++];
         const abs = path.join(root, m.path);
         // Warm every still-missing grid variant (256 for 1×, 512 for retina) +
@@ -242,14 +373,8 @@ class Thumbnailer {
         // decode then covers all three. The larger VIEW_SIZES stay on-demand —
         // the lightbox opens one image at a time, and pre-rendering 2048px
         // copies for the whole library would bloat the cache upfront.
-        const jobs = [];
-        for (const s of THUMB_SIZES) {
-          const out = this._thumbPath(m.hash, s);
-          if (!fs.existsSync(out)) jobs.push(this._thumbJob(out, s));
-        }
-        const blurOut = this._blurPath(m.hash);
-        if (!fs.existsSync(blurOut)) jobs.push(this._blurJob(blurOut));
-        if (jobs.length) await this._render(abs, jobs);
+        const jobs = this._missingGridJobs(m.hash);
+        if (jobs.length) await this._render(m.hash, abs, jobs, false);
       }
     };
 

@@ -236,7 +236,12 @@
     // attributes until the tile nears the viewport (see the lazy loader), so
     // idle tiles fetch nothing. `sizes` is a plain attribute and is kept in sync
     // with the measured tile width on resize (see the resize handler).
-    const base = `/media/thumb?hash=${m.hash}`;
+    // `v=2` busts caches poisoned during the era when HEIC thumbnails always
+    // failed: the server then served the original HEIC bytes (unrenderable in a
+    // browser) under this same URL with an immutable year-long cache header, so
+    // without a new URL those tiles would stay broken even after thumbnails
+    // started generating. The server ignores unknown params.
+    const base = `/media/thumb?hash=${m.hash}&amp;v=2`;
     const srcset = `${base}&amp;w=256 256w, ${base}&amp;w=512 512w`;
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
       <img${blurAttr} data-src="${base}&amp;w=256" data-srcset="${srcset}" sizes="${tileH || 256}px" alt="">
@@ -566,7 +571,7 @@
     $('lbStage').innerHTML =
       m.type === 'video'
         ? `<video src="/media/file?hash=${m.hash}" controls autoplay></video>`
-        : `<img src="/media/view?hash=${m.hash}&w=${viewWidth()}" alt="">`;
+        : `<img src="/media/view?hash=${m.hash}&w=${viewWidth()}&v=2" alt="">`; // v=2: see renderTile
   }
   function navLightbox(delta) {
     const n = media.length;
