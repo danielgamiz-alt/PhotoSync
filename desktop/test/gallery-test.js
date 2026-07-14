@@ -255,6 +255,37 @@ async function main() {
       console.log('  skip view: non-web conversion (sharp not installed)');
     }
 
+    // ---- HEIC decode worker plumbing -------------------------------------
+    // Real HEIC fixtures can't be synthesised (sharp can't ENCODE heic), so
+    // exercise the worker-thread path with a PNG source instead: heic-decode
+    // rejects it and the worker's sharp fallback renders it — which still proves
+    // the whole pipeline (thread spawn, postMessage, decode fallback, multi-job
+    // output from one decode, and shutdown) works end to end.
+    if (sharpOk) {
+      const sharp = require('sharp');
+      const os = require('os');
+      // Isolate the worker's output in its own temp dir: sharp-in-a-worker keeps
+      // a Windows file handle on freshly-written files even after the thread is
+      // terminated, so we keep them out of the harness's main temp dir (whose
+      // teardown isn't EBUSY-tolerant) and clean up best-effort here.
+      const wdir = fs.mkdtempSync(path.join(os.tmpdir(), 'heic-worker-test-'));
+      const png = await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 10, g: 120, b: 200 } } }).png().toBuffer();
+      const src = path.join(wdir, 'worker-src.png');
+      fs.writeFileSync(src, png);
+      const out256 = path.join(wdir, 't256.webp');
+      const out512 = path.join(wdir, 't512.webp');
+      const ok = await thumbnailer._renderViaWorker(src, [thumbnailer._thumbJob(out256, 256), thumbnailer._thumbJob(out512, 512)]);
+      check('heic worker: render ok', ok === true, `got ${ok}`);
+      check('heic worker: both variants from one decode', fs.existsSync(out256) && fs.existsSync(out512));
+      const wmeta = fs.existsSync(out256) ? await sharp(out256).metadata() : {};
+      check('heic worker: output is 256x256 webp', wmeta.format === 'webp' && wmeta.width === 256 && wmeta.height === 256,
+        `${wmeta.format} ${wmeta.width}x${wmeta.height}`);
+      await thumbnailer.dispose(); // stop the worker
+      try { fs.rmSync(wdir, { recursive: true, force: true }); } catch { /* handle may linger briefly on Windows */ }
+    } else {
+      console.log('  skip heic worker (sharp not installed)');
+    }
+
     // missing hash
     const missing = await fetch(`${BASE}/media/file?hash=deadbeef`);
     check('file: missing → 404', missing.status === 404);

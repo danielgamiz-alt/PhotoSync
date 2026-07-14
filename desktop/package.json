@@ -13,6 +13,7 @@
     "test": "node test/control-test.js && node test/gallery-test.js && node test/single-instance-test.js"
   },
   "dependencies": {
+    "heic-decode": "^2.1.0",
     "node-notifier": "^10.0.1",
     "systray2": "^2.0.3"
   },
