@@ -169,9 +169,12 @@ class Thumbnailer {
       // Don't make the browser wait ~a second of WASM decode for a cosmetic
       // placeholder — that pins one of its six connections per tile and starves
       // every other tile's fetch. Answer "no blur yet" immediately and start the
-      // full render in the background; the tile's thumbnail request lands next
-      // and coalesces onto this in-flight decode.
-      this._render(hash, absSource, this._missingGridJobs(hash), true).catch(() => {});
+      // full render in the background. NON-urgent: a blur alone may be a tile
+      // merely scrolled past, and fly-past renders must not delay tiles the
+      // user actually landed on. If this tile IS on screen, its thumbnail
+      // request arrives right behind and coalesces onto this entry, upgrading
+      // it to urgent — so visible tiles still jump the queue.
+      this._render(hash, absSource, this._missingGridJobs(hash), false).catch(() => {});
       return null;
     }
     const ok = await this._render(hash, absSource, [this._blurJob(out)], true);

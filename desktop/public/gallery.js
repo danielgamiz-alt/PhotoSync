@@ -308,11 +308,15 @@
     if (img.dataset.srcset) img.setAttribute('srcset', img.dataset.srcset);
     img.setAttribute('src', src);
   }
-  function enqueueThumb(img, src) {
+  function enqueueThumb(img, src, front) {
     if (img._thumbQueued || img._releaseThumb) return; // already waiting/loading
     img._thumbSrc = src;
     img._thumbQueued = true;
-    thumbQueue.push(img);
+    // On-screen tiles jump the queue: after a jump/fling the observer batch
+    // covers the whole preload band (~2.5 viewports), and FIFO order would
+    // load the off-screen margin before what the user is actually looking at.
+    if (front) thumbQueue.unshift(img);
+    else thumbQueue.push(img);
     drainThumbQueue();
   }
   let tileObserver = null;
@@ -320,21 +324,29 @@
   function loadTileMedia(el) {
     const src = el.dataset.src;
     if (!src || el.getAttribute('src') === src) return;
+    const tile = el.closest('.tile') || el;
+    const r = tile.getBoundingClientRect();
+    const nearViewport = r.bottom > -150 && r.top < window.innerHeight + 150;
     if (el.tagName === 'VIDEO') {
       el.preload = 'metadata';
       el.setAttribute('src', src);
       return;
     }
-    // Paint the tiny blur placeholder immediately (browser-cached, ~0.5 KB) so
-    // the tile is never blank while the full thumbnail loads via the queue.
+    // Paint the tiny blur placeholder (browser-cached, ~0.5 KB) so the tile is
+    // never blank while the full thumbnail loads via the queue — but only for
+    // tiles the user can (almost) see. Blur requests skip the thumb queue and
+    // go straight to the network, so firing them for the whole preload band
+    // (~100 tiles after a fling) would occupy every browser connection ahead
+    // of the visible tiles' thumbnails.
     const blur = el.dataset.blur;
-    if (blur && el.getAttribute('src') !== blur) {
+    if (nearViewport && blur && el.getAttribute('src') !== blur) {
       el.setAttribute('src', blur);
       el.classList.add('thumb-blur');
     }
-    enqueueThumb(el, src);
+    enqueueThumb(el, src, nearViewport);
   }
   function unloadTileMedia(el) {
+    pendingTiles.delete(el); // a tile leaving the band must not load on settle
     const blurSrc = el.dataset.blur;
     if (el.tagName === 'VIDEO') {
       if (!el.hasAttribute('src')) return;
@@ -359,6 +371,34 @@
       el.removeAttribute('src');
     }
   }
+  // ---- settle-gated loading -------------------------------------------------
+  // Nothing mounts or loads while the user is mid-fling. Observer events only
+  // record what is currently in the preload band (cheap Set bookkeeping — no
+  // layout reads, no timers per element); the actual work happens once, when
+  // events go quiet for SETTLE_MS. Before this, a fast fling across the 25k
+  // library queued hundreds of section mounts and media loads for content that
+  // had already streaked past — the landing viewport sat blank for ~10s of
+  // main-thread churn and its requests starved behind ~400 stale fetches.
+  const SETTLE_MS = 120;
+  const pendingSections = new Set();
+  const pendingTiles = new Set();
+  let settleTimer = null;
+  function scheduleSettle() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(processPending, SETTLE_MS);
+  }
+  function processPending() {
+    // Mount sections first: their tiles then get observed, land in
+    // pendingTiles, and load on the next settle tick.
+    for (const grid of pendingSections) {
+      pendingSections.delete(grid);
+      if (grid.isConnected) mountSection(grid);
+    }
+    for (const el of pendingTiles) {
+      pendingTiles.delete(el);
+      if (el.isConnected) loadTileMedia(el);
+    }
+  }
   function ensureTileObserver() {
     if (tileObserver) return;
     tileObserver = new IntersectionObserver(
@@ -366,9 +406,14 @@
         for (const e of entries) {
           const el = e.target.querySelector('img, video');
           if (!el) continue;
-          if (e.isIntersecting) loadTileMedia(el);
-          else unloadTileMedia(el);
+          if (e.isIntersecting) {
+            pendingTiles.add(el);
+          } else {
+            pendingTiles.delete(el);
+            unloadTileMedia(el);
+          }
         }
+        scheduleSettle();
       },
       { rootMargin: '1000px 0px' }
     );
@@ -431,9 +476,15 @@
     sectionObserver = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting) mountSection(e.target);
-          else unmountSection(e.target);
+          const grid = e.target;
+          if (e.isIntersecting) {
+            if (!grid.dataset.mounted) pendingSections.add(grid);
+          } else {
+            pendingSections.delete(grid);
+            unmountSection(grid);
+          }
         }
+        scheduleSettle(); // mount only once the fling settles (see processPending)
       },
       { rootMargin: '1400px 0px' }
     );
