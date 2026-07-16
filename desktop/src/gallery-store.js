@@ -181,6 +181,23 @@ class Thumbnailer {
     return ok && fs.existsSync(out) ? out : null;
   }
 
+  /**
+   * Reads intrinsic image dimensions (width/height in px) from a file's header,
+   * for the viewer's properties panel. Cheap — sharp parses the container
+   * metadata without decoding pixels, so it works even for the HEVC HEICs the
+   * bundled libheif can't actually decode. Returns null for videos or on error.
+   */
+  async probe(absSource) {
+    if (!sharp) return null;
+    try {
+      const m = await sharp(absSource).metadata();
+      if (!m.width || !m.height) return null;
+      return { width: m.width, height: m.height };
+    } catch {
+      return null;
+    }
+  }
+
   /** Every grid derivative (both thumb sizes + blur) still missing for `hash` —
    *  the set one HEIC decode should produce in a single pass. */
   _missingGridJobs(hash) {

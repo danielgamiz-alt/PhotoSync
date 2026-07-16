@@ -573,7 +573,7 @@
     selected.clear();
     updateSelBar();
   };
-  $('selDelete').onclick = () => {
+  function deleteSelected() {
     const n = selected.size;
     if (!n) return;
     if (!confirm(
@@ -581,7 +581,8 @@
       `This frees space here and does NOT delete anything from your phone.`
     )) return;
     deleteHashes([...selected]);
-  };
+  }
+  $('selDelete').onclick = deleteSelected;
 
   async function deleteHashes(hashes) {
     try {
@@ -607,6 +608,7 @@
   function closeLightbox() {
     $('lightbox').classList.add('hidden');
     $('lbStage').innerHTML = ''; // stop video playback
+    hideProperties();
     lightboxIndex = -1;
   }
   // Longest screen edge × DPR, so the viewer fetches a copy sized to this
@@ -629,10 +631,64 @@
     if (n === 0) return;
     lightboxIndex = (lightboxIndex + delta + n) % n;
     renderLightbox();
+    if (!$('lbInfoPanel').classList.contains('hidden')) showProperties(); // keep panel in sync
   }
+  async function deleteCurrent() {
+    const m = media[lightboxIndex];
+    if (!m) return;
+    if (!confirm("Delete this item from this computer's backup?")) return;
+    closeLightbox();
+    await deleteHashes([m.hash]);
+  }
+
+  // ---- properties panel ----------------------------------------------------
+  function fmtBytes(n) {
+    if (!n) return '—';
+    const u = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return `${i === 0 ? n : n.toFixed(1)} ${u[i]}`;
+  }
+  function showProperties() {
+    const m = media[lightboxIndex];
+    if (!m) return;
+    $('lbiName').textContent = m.name || '—';
+    $('lbiDate').textContent = m.takenAt ? new Date(m.takenAt).toLocaleString() : 'Unknown';
+    $('lbiSize').textContent = fmtBytes(m.size);
+    $('lbiType').textContent = m.type === 'video' ? 'Video' : 'Photo';
+    $('lbiAccount').textContent = m.user || '—';
+    $('lbiDims').textContent = '…';
+    $('lbiFolder').textContent = '…';
+    $('lbInfoPanel').classList.remove('hidden');
+    $('lbInfo').classList.add('active');
+    // Dimensions + on-disk folder aren't in the media list — fetch on demand.
+    // Guard against a race with fast ←/→ nav by pinning the hash we asked for.
+    const forHash = m.hash;
+    fetch(`/api/media/meta?hash=${m.hash}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (media[lightboxIndex] && media[lightboxIndex].hash !== forHash) return; // navigated away
+        $('lbiDims').textContent = d.width && d.height ? `${d.width} × ${d.height}` : '—';
+        $('lbiFolder').textContent = d.folder || '—';
+      })
+      .catch(() => {
+        $('lbiDims').textContent = '—';
+        $('lbiFolder').textContent = '—';
+      });
+  }
+  function hideProperties() {
+    $('lbInfoPanel').classList.add('hidden');
+    $('lbInfo').classList.remove('active');
+  }
+  function toggleProperties() {
+    if ($('lbInfoPanel').classList.contains('hidden')) showProperties();
+    else hideProperties();
+  }
+
   $('lbClose').onclick = closeLightbox;
   $('lbPrev').onclick = () => navLightbox(-1);
   $('lbNext').onclick = () => navLightbox(1);
+  $('lbInfo').onclick = toggleProperties;
   $('lbFolder').onclick = async () => {
     const m = media[lightboxIndex];
     if (!m) return;
@@ -643,13 +699,7 @@
       body: JSON.stringify({ hash: m.hash }),
     }).catch(() => {});
   };
-  $('lbDelete').onclick = async () => {
-    const m = media[lightboxIndex];
-    if (!m) return;
-    if (!confirm("Delete this item from this computer's backup?")) return;
-    closeLightbox();
-    await deleteHashes([m.hash]);
-  };
+  $('lbDelete').onclick = deleteCurrent;
   $('lightbox').addEventListener('click', (e) => {
     if (e.target.id === 'lightbox') closeLightbox();
   });
@@ -658,6 +708,17 @@
     if (e.key === 'Escape') closeLightbox();
     else if (e.key === 'ArrowLeft') navLightbox(-1);
     else if (e.key === 'ArrowRight') navLightbox(1);
+    else if (e.key === 'Delete') deleteCurrent();
+    else if (e.key === 'i' || e.key === 'I') toggleProperties();
+  });
+  // Grid: Delete removes the current selection (viewer closed, Photos tab).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Delete') return;
+    if (activeTab !== 'photos') return;
+    if (!$('lightbox').classList.contains('hidden')) return; // viewer handles its own Delete
+    if (selected.size === 0) return;
+    e.preventDefault();
+    deleteSelected();
   });
 
   // ---- trash (recycle bin) -------------------------------------------------

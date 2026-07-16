@@ -310,6 +310,19 @@ async function main() {
       console.log('  skip heic worker (sharp not installed)');
     }
 
+    // ---- properties endpoint (/api/media/meta) ---------------------------
+    // Dimensions come from the file header (works even when sharp can't decode
+    // the pixels), plus the on-disk folder — both fed to the viewer's info panel.
+    const metaRes = await fetch(`${BASE}/api/media/meta?hash=${h1}`);
+    check('meta: 200', metaRes.status === 200, `got ${metaRes.status}`);
+    const meta = await metaRes.json();
+    if (sharpOk) {
+      check('meta: reports 1×1 dimensions', meta.width === 1 && meta.height === 1, `${meta.width}x${meta.height}`);
+    }
+    check('meta: reports on-disk folder', typeof meta.folder === 'string' && meta.folder.includes('.thumbs') === false && meta.folder.length > 0);
+    const metaMissing = await fetch(`${BASE}/api/media/meta?hash=deadbeef`);
+    check('meta: missing → 404', metaMissing.status === 404);
+
     // missing hash
     const missing = await fetch(`${BASE}/media/file?hash=deadbeef`);
     check('file: missing → 404', missing.status === 404);

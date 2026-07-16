@@ -122,6 +122,20 @@ async function route(req, res, deps) {
     return serveFile(req, res, entry.abs, mimeFor(entry.path));
   }
 
+  // Extra properties for the viewer's info panel that aren't in the media list:
+  // pixel dimensions (read from the file header) and the on-disk folder. Kept
+  // separate from /api/media so the big list stays small; fetched on demand.
+  if (p === '/api/media/meta' && req.method === 'GET') {
+    const entry = entryFor(deps, url.searchParams.get('hash'));
+    if (!entry) return sendJson(res, 404, { error: 'not found' });
+    const dims = await deps.thumbnailer.probe(entry.abs);
+    return sendJson(res, 200, {
+      width: dims ? dims.width : null,
+      height: dims ? dims.height : null,
+      folder: path.dirname(entry.abs),
+    });
+  }
+
   // Full-screen viewer source. Videos stream straight from disk. Images are
   // served as an inside-fit WebP sized to the viewport (`w` = longest screen
   // edge × DPR, snapped to an allowlisted size) — so a fit-to-window lightbox
