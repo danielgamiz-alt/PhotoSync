@@ -349,6 +349,8 @@ async function main() {
     } catch {
       /* ignore */
     }
+    thumbnailer.cancelWarmUp();
+    await thumbnailer.dispose().catch(() => {}); // stop the HEIC worker thread
     if (tray) tray.kill();
     process.exit(0);
   }

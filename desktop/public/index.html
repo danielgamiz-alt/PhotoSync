@@ -286,8 +286,21 @@
     <button id="lbPrev" class="lb-btn lb-prev" title="Previous (←)" aria-label="Previous photo">‹</button>
     <div id="lbStage" class="lb-stage"></div>
     <button id="lbNext" class="lb-btn lb-next" title="Next (→)" aria-label="Next photo">›</button>
+    <button id="lbInfo" class="lb-btn lb-info-btn" title="Properties (i)" aria-label="Photo properties">ⓘ</button>
     <button id="lbFolder" class="lb-btn lb-folder" title="Show this file in its folder">Open folder</button>
-    <button id="lbDelete" class="lb-btn lb-delete" title="Delete">Delete</button>
+    <button id="lbDelete" class="lb-btn lb-delete" title="Delete (Del)">Delete</button>
+    <div id="lbInfoPanel" class="lb-info hidden" aria-live="polite">
+      <div class="lb-info-title">Properties</div>
+      <dl class="lb-info-list">
+        <div><dt>Name</dt><dd id="lbiName">—</dd></div>
+        <div><dt>Taken</dt><dd id="lbiDate">—</dd></div>
+        <div><dt>Resolution</dt><dd id="lbiDims">—</dd></div>
+        <div><dt>Size</dt><dd id="lbiSize">—</dd></div>
+        <div><dt>Type</dt><dd id="lbiType">—</dd></div>
+        <div><dt>Account</dt><dd id="lbiAccount">—</dd></div>
+        <div><dt>Folder</dt><dd id="lbiFolder">—</dd></div>
+      </dl>
+    </div>
   </div>
 
   <script src="/app.js"></script>

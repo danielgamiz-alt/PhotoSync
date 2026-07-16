@@ -255,6 +255,74 @@ async function main() {
       console.log('  skip view: non-web conversion (sharp not installed)');
     }
 
+    // ---- HEIC decode worker plumbing -------------------------------------
+    // Real HEIC fixtures can't be synthesised (sharp can't ENCODE heic), so
+    // exercise the worker-thread path with a PNG source instead: heic-decode
+    // rejects it and the worker's sharp fallback renders it — which still proves
+    // the whole pipeline (thread spawn, postMessage, decode fallback, multi-job
+    // output from one decode, and shutdown) works end to end.
+    if (sharpOk) {
+      const sharp = require('sharp');
+      const os = require('os');
+      // Isolate the worker's output in its own temp dir: sharp-in-a-worker keeps
+      // a Windows file handle on freshly-written files even after the thread is
+      // terminated, so we keep them out of the harness's main temp dir (whose
+      // teardown isn't EBUSY-tolerant) and clean up best-effort here.
+      const wdir = fs.mkdtempSync(path.join(os.tmpdir(), 'heic-worker-test-'));
+      const png = await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 10, g: 120, b: 200 } } }).png().toBuffer();
+      const src = path.join(wdir, 'worker-src.png');
+      fs.writeFileSync(src, png);
+      const out256 = path.join(wdir, 't256.webp');
+      const out512 = path.join(wdir, 't512.webp');
+      const ok = await thumbnailer._renderHeic('workerjob', src, [thumbnailer._thumbJob(out256, 256), thumbnailer._thumbJob(out512, 512)], true);
+      check('heic worker: render ok', ok === true, `got ${ok}`);
+      check('heic worker: both variants from one decode', fs.existsSync(out256) && fs.existsSync(out512));
+      const wmeta = fs.existsSync(out256) ? await sharp(out256).metadata() : {};
+      check('heic worker: output is 256x256 webp', wmeta.format === 'webp' && wmeta.width === 256 && wmeta.height === 256,
+        `${wmeta.format} ${wmeta.width}x${wmeta.height}`);
+
+      // Coalescing: two concurrent requests for the same source must share one
+      // queue entry (second one merges its job into the first).
+      const outA = path.join(wdir, 'co-a.webp');
+      const outB = path.join(wdir, 'co-b.webp');
+      const [okA, okB] = await Promise.all([
+        thumbnailer._renderHeic('co', src, [thumbnailer._thumbJob(outA, 256)], true),
+        thumbnailer._renderHeic('co', src, [thumbnailer._thumbJob(outB, 512)], true),
+      ]);
+      check('heic worker: coalesced requests both succeed', okA === true && okB === true, `${okA}/${okB}`);
+      check('heic worker: coalesced outputs both written', fs.existsSync(outA) && fs.existsSync(outB));
+
+      // A source that fails to decode entirely (garbage .heic): thumb() returns
+      // null and the endpoint must serve the fallback as no-store, so the
+      // browser retries later instead of caching the broken bytes for a year.
+      const { Readable } = require('stream');
+      const badHash = (await storage.store(Readable.from(Buffer.from('not a real heic file')), { filename: 'corrupt.heic', takenAt: 0 })).hash;
+      const badRes = await fetch(`${BASE}/media/thumb?hash=${badHash}&w=256`);
+      check('heic fallback: 200 original bytes', badRes.status === 200, `got ${badRes.status}`);
+      check('heic fallback: not browser-cached (no-store)', badRes.headers.get('cache-control') === 'no-store',
+        badRes.headers.get('cache-control'));
+      await storage.remove(badHash);
+      await thumbnailer.forget(badHash);
+
+      await thumbnailer.dispose(); // stop the worker pool
+      try { fs.rmSync(wdir, { recursive: true, force: true }); } catch { /* handle may linger briefly on Windows */ }
+    } else {
+      console.log('  skip heic worker (sharp not installed)');
+    }
+
+    // ---- properties endpoint (/api/media/meta) ---------------------------
+    // Dimensions come from the file header (works even when sharp can't decode
+    // the pixels), plus the on-disk folder — both fed to the viewer's info panel.
+    const metaRes = await fetch(`${BASE}/api/media/meta?hash=${h1}`);
+    check('meta: 200', metaRes.status === 200, `got ${metaRes.status}`);
+    const meta = await metaRes.json();
+    if (sharpOk) {
+      check('meta: reports 1×1 dimensions', meta.width === 1 && meta.height === 1, `${meta.width}x${meta.height}`);
+    }
+    check('meta: reports on-disk folder', typeof meta.folder === 'string' && meta.folder.includes('.thumbs') === false && meta.folder.length > 0);
+    const metaMissing = await fetch(`${BASE}/api/media/meta?hash=deadbeef`);
+    check('meta: missing → 404', metaMissing.status === 404);
+
     // missing hash
     const missing = await fetch(`${BASE}/media/file?hash=deadbeef`);
     check('file: missing → 404', missing.status === 404);

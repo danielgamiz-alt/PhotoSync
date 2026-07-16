@@ -99,7 +99,12 @@ async function route(req, res, deps) {
     const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
     const thumb = await deps.thumbnailer.thumb(entry.hash, entry.abs, type, w);
     if (thumb) return serveFile(req, res, thumb, mimeFor(thumb));
-    return serveFile(req, res, entry.abs, mimeFor(entry.path)); // fallback: original
+    // Fallback: original bytes. If a render SHOULD have worked (an image, with
+    // sharp present) this is a transient failure — mark it no-store so the
+    // browser doesn't cache the unrenderable original for a year and keep
+    // showing a broken tile long after the thumbnail exists.
+    const transient = type === 'image' && deps.thumbnailer.available;
+    return serveFile(req, res, entry.abs, mimeFor(entry.path), transient ? 'no-store' : undefined);
   }
 
   if (p === '/media/blur' && req.method === 'GET') {
@@ -115,6 +120,20 @@ async function route(req, res, deps) {
     const entry = entryFor(deps, url.searchParams.get('hash'));
     if (!entry) return sendJson(res, 404, { error: 'not found' });
     return serveFile(req, res, entry.abs, mimeFor(entry.path));
+  }
+
+  // Extra properties for the viewer's info panel that aren't in the media list:
+  // pixel dimensions (read from the file header) and the on-disk folder. Kept
+  // separate from /api/media so the big list stays small; fetched on demand.
+  if (p === '/api/media/meta' && req.method === 'GET') {
+    const entry = entryFor(deps, url.searchParams.get('hash'));
+    if (!entry) return sendJson(res, 404, { error: 'not found' });
+    const dims = await deps.thumbnailer.probe(entry.abs);
+    return sendJson(res, 200, {
+      width: dims ? dims.width : null,
+      height: dims ? dims.height : null,
+      folder: path.dirname(entry.abs),
+    });
   }
 
   // Full-screen viewer source. Videos stream straight from disk. Images are
@@ -134,7 +153,9 @@ async function route(req, res, deps) {
     const w = parseInt(url.searchParams.get('w') || '', 10) || undefined;
     const view = await deps.thumbnailer.view(entry.hash, entry.abs, 'image', w);
     if (view) return serveFile(req, res, view, mimeFor(view));
-    return serveFile(req, res, entry.abs, mime); // sharp missing / decode failed
+    // Same no-store rationale as /media/thumb: don't let a failed render pin the
+    // (possibly unrenderable) original in the browser cache for a year.
+    return serveFile(req, res, entry.abs, mime, deps.thumbnailer.available ? 'no-store' : undefined);
   }
 
   if (p === '/api/media/reveal' && req.method === 'POST') {
@@ -288,7 +309,9 @@ function entryFor(deps, hash) {
 }
 
 // Streams a file, honouring HTTP Range requests so <video> can seek.
-function serveFile(req, res, absPath, mime) {
+// `cacheControl` overrides the default immutable policy (e.g. 'no-store' for
+// fallback responses that a later successful render should replace).
+function serveFile(req, res, absPath, mime, cacheControl) {
   let stat;
   try {
     stat = fs.statSync(absPath);
@@ -302,7 +325,7 @@ function serveFile(req, res, absPath, mime) {
     // Media URLs are addressed by content hash (or a stable trash id), so the
     // bytes never change — let the browser keep them for good and skip the
     // constant thumbnail re-downloads when scrolling back over the library.
-    'cache-control': 'private, max-age=31536000, immutable',
+    'cache-control': cacheControl || 'private, max-age=31536000, immutable',
   };
 
   const range = req.headers.range;

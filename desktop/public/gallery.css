@@ -90,8 +90,8 @@
 
 .day-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
 }
 
 /* ---- tile ---- */
@@ -175,7 +175,24 @@
 .lb-close { top: 16px; right: 16px; width: 42px; height: 42px; font-size: 20px; }
 .lb-delete { top: 16px; right: 70px; height: 42px; padding: 0 16px; font-weight: 600; background: rgba(217,48,37,.85); }
 .lb-folder { top: 16px; right: 168px; height: 42px; padding: 0 16px; font-weight: 600; }
+.lb-info-btn { top: 16px; right: 288px; width: 42px; height: 42px; font-size: 20px; }
+.lb-info-btn.active { background: rgba(255,255,255,.3); }
 .lb-prev, .lb-next { top: 50%; transform: translateY(-50%); width: 48px; height: 64px; font-size: 30px; }
 .lb-prev { left: 16px; }
 .lb-next { right: 16px; }
 .lb-btn:hover { background: rgba(255,255,255,.25); }
+
+/* Properties panel — a card anchored bottom-left of the viewer. */
+.lb-info {
+  position: absolute; left: 16px; bottom: 16px; z-index: 2;
+  width: min(360px, 80vw); max-height: 70vh; overflow: auto;
+  background: rgba(20,20,22,.92); color: #fff;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 12px;
+  padding: 14px 16px; backdrop-filter: blur(6px);
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.lb-info-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; opacity: .9; }
+.lb-info-list { margin: 0; display: grid; gap: 8px; }
+.lb-info-list > div { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: baseline; }
+.lb-info-list dt { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.5); }
+.lb-info-list dd { margin: 0; font-size: 13px; word-break: break-word; }

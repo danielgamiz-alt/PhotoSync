@@ -236,7 +236,12 @@
     // attributes until the tile nears the viewport (see the lazy loader), so
     // idle tiles fetch nothing. `sizes` is a plain attribute and is kept in sync
     // with the measured tile width on resize (see the resize handler).
-    const base = `/media/thumb?hash=${m.hash}`;
+    // `v=2` busts caches poisoned during the era when HEIC thumbnails always
+    // failed: the server then served the original HEIC bytes (unrenderable in a
+    // browser) under this same URL with an immutable year-long cache header, so
+    // without a new URL those tiles would stay broken even after thumbnails
+    // started generating. The server ignores unknown params.
+    const base = `/media/thumb?hash=${m.hash}&amp;v=2`;
     const srcset = `${base}&amp;w=256 256w, ${base}&amp;w=512 512w`;
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
       <img${blurAttr} data-src="${base}&amp;w=256" data-srcset="${srcset}" sizes="${tileH || 256}px" alt="">
@@ -303,11 +308,15 @@
     if (img.dataset.srcset) img.setAttribute('srcset', img.dataset.srcset);
     img.setAttribute('src', src);
   }
-  function enqueueThumb(img, src) {
+  function enqueueThumb(img, src, front) {
     if (img._thumbQueued || img._releaseThumb) return; // already waiting/loading
     img._thumbSrc = src;
     img._thumbQueued = true;
-    thumbQueue.push(img);
+    // On-screen tiles jump the queue: after a jump/fling the observer batch
+    // covers the whole preload band (~2.5 viewports), and FIFO order would
+    // load the off-screen margin before what the user is actually looking at.
+    if (front) thumbQueue.unshift(img);
+    else thumbQueue.push(img);
     drainThumbQueue();
   }
   let tileObserver = null;
@@ -315,21 +324,29 @@
   function loadTileMedia(el) {
     const src = el.dataset.src;
     if (!src || el.getAttribute('src') === src) return;
+    const tile = el.closest('.tile') || el;
+    const r = tile.getBoundingClientRect();
+    const nearViewport = r.bottom > -150 && r.top < window.innerHeight + 150;
     if (el.tagName === 'VIDEO') {
       el.preload = 'metadata';
       el.setAttribute('src', src);
       return;
     }
-    // Paint the tiny blur placeholder immediately (browser-cached, ~0.5 KB) so
-    // the tile is never blank while the full thumbnail loads via the queue.
+    // Paint the tiny blur placeholder (browser-cached, ~0.5 KB) so the tile is
+    // never blank while the full thumbnail loads via the queue — but only for
+    // tiles the user can (almost) see. Blur requests skip the thumb queue and
+    // go straight to the network, so firing them for the whole preload band
+    // (~100 tiles after a fling) would occupy every browser connection ahead
+    // of the visible tiles' thumbnails.
     const blur = el.dataset.blur;
-    if (blur && el.getAttribute('src') !== blur) {
+    if (nearViewport && blur && el.getAttribute('src') !== blur) {
       el.setAttribute('src', blur);
       el.classList.add('thumb-blur');
     }
-    enqueueThumb(el, src);
+    enqueueThumb(el, src, nearViewport);
   }
   function unloadTileMedia(el) {
+    pendingTiles.delete(el); // a tile leaving the band must not load on settle
     const blurSrc = el.dataset.blur;
     if (el.tagName === 'VIDEO') {
       if (!el.hasAttribute('src')) return;
@@ -354,6 +371,34 @@
       el.removeAttribute('src');
     }
   }
+  // ---- settle-gated loading -------------------------------------------------
+  // Nothing mounts or loads while the user is mid-fling. Observer events only
+  // record what is currently in the preload band (cheap Set bookkeeping — no
+  // layout reads, no timers per element); the actual work happens once, when
+  // events go quiet for SETTLE_MS. Before this, a fast fling across the 25k
+  // library queued hundreds of section mounts and media loads for content that
+  // had already streaked past — the landing viewport sat blank for ~10s of
+  // main-thread churn and its requests starved behind ~400 stale fetches.
+  const SETTLE_MS = 120;
+  const pendingSections = new Set();
+  const pendingTiles = new Set();
+  let settleTimer = null;
+  function scheduleSettle() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(processPending, SETTLE_MS);
+  }
+  function processPending() {
+    // Mount sections first: their tiles then get observed, land in
+    // pendingTiles, and load on the next settle tick.
+    for (const grid of pendingSections) {
+      pendingSections.delete(grid);
+      if (grid.isConnected) mountSection(grid);
+    }
+    for (const el of pendingTiles) {
+      pendingTiles.delete(el);
+      if (el.isConnected) loadTileMedia(el);
+    }
+  }
   function ensureTileObserver() {
     if (tileObserver) return;
     tileObserver = new IntersectionObserver(
@@ -361,9 +406,14 @@
         for (const e of entries) {
           const el = e.target.querySelector('img, video');
           if (!el) continue;
-          if (e.isIntersecting) loadTileMedia(el);
-          else unloadTileMedia(el);
+          if (e.isIntersecting) {
+            pendingTiles.add(el);
+          } else {
+            pendingTiles.delete(el);
+            unloadTileMedia(el);
+          }
         }
+        scheduleSettle();
       },
       { rootMargin: '1000px 0px' }
     );
@@ -373,8 +423,8 @@
   // Tiles are uniform squares, so each section's pixel height is known from its
   // photo count without laying the tiles out. We reserve that height, then
   // mount/unmount each section's tiles as it enters/leaves an expanded viewport.
-  const GRID_GAP = 4;   // must match .day-grid `gap` in gallery.css
-  const MIN_TILE = 160; // must match .day-grid minmax(160px, …) in gallery.css
+  const GRID_GAP = 8;   // must match .day-grid `gap` in gallery.css
+  const MIN_TILE = 220; // must match .day-grid minmax(220px, …) in gallery.css
 
   function computeLayout() {
     const grid = $('gallery').querySelector('.day-grid');
@@ -426,9 +476,15 @@
     sectionObserver = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting) mountSection(e.target);
-          else unmountSection(e.target);
+          const grid = e.target;
+          if (e.isIntersecting) {
+            if (!grid.dataset.mounted) pendingSections.add(grid);
+          } else {
+            pendingSections.delete(grid);
+            unmountSection(grid);
+          }
         }
+        scheduleSettle(); // mount only once the fling settles (see processPending)
       },
       { rootMargin: '1400px 0px' }
     );
@@ -517,7 +573,7 @@
     selected.clear();
     updateSelBar();
   };
-  $('selDelete').onclick = () => {
+  function deleteSelected() {
     const n = selected.size;
     if (!n) return;
     if (!confirm(
@@ -525,7 +581,8 @@
       `This frees space here and does NOT delete anything from your phone.`
     )) return;
     deleteHashes([...selected]);
-  };
+  }
+  $('selDelete').onclick = deleteSelected;
 
   async function deleteHashes(hashes) {
     try {
@@ -551,6 +608,7 @@
   function closeLightbox() {
     $('lightbox').classList.add('hidden');
     $('lbStage').innerHTML = ''; // stop video playback
+    hideProperties();
     lightboxIndex = -1;
   }
   // Longest screen edge × DPR, so the viewer fetches a copy sized to this
@@ -566,17 +624,71 @@
     $('lbStage').innerHTML =
       m.type === 'video'
         ? `<video src="/media/file?hash=${m.hash}" controls autoplay></video>`
-        : `<img src="/media/view?hash=${m.hash}&w=${viewWidth()}" alt="">`;
+        : `<img src="/media/view?hash=${m.hash}&w=${viewWidth()}&v=2" alt="">`; // v=2: see renderTile
   }
   function navLightbox(delta) {
     const n = media.length;
     if (n === 0) return;
     lightboxIndex = (lightboxIndex + delta + n) % n;
     renderLightbox();
+    if (!$('lbInfoPanel').classList.contains('hidden')) showProperties(); // keep panel in sync
   }
+  async function deleteCurrent() {
+    const m = media[lightboxIndex];
+    if (!m) return;
+    if (!confirm("Delete this item from this computer's backup?")) return;
+    closeLightbox();
+    await deleteHashes([m.hash]);
+  }
+
+  // ---- properties panel ----------------------------------------------------
+  function fmtBytes(n) {
+    if (!n) return '—';
+    const u = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return `${i === 0 ? n : n.toFixed(1)} ${u[i]}`;
+  }
+  function showProperties() {
+    const m = media[lightboxIndex];
+    if (!m) return;
+    $('lbiName').textContent = m.name || '—';
+    $('lbiDate').textContent = m.takenAt ? new Date(m.takenAt).toLocaleString() : 'Unknown';
+    $('lbiSize').textContent = fmtBytes(m.size);
+    $('lbiType').textContent = m.type === 'video' ? 'Video' : 'Photo';
+    $('lbiAccount').textContent = m.user || '—';
+    $('lbiDims').textContent = '…';
+    $('lbiFolder').textContent = '…';
+    $('lbInfoPanel').classList.remove('hidden');
+    $('lbInfo').classList.add('active');
+    // Dimensions + on-disk folder aren't in the media list — fetch on demand.
+    // Guard against a race with fast ←/→ nav by pinning the hash we asked for.
+    const forHash = m.hash;
+    fetch(`/api/media/meta?hash=${m.hash}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (media[lightboxIndex] && media[lightboxIndex].hash !== forHash) return; // navigated away
+        $('lbiDims').textContent = d.width && d.height ? `${d.width} × ${d.height}` : '—';
+        $('lbiFolder').textContent = d.folder || '—';
+      })
+      .catch(() => {
+        $('lbiDims').textContent = '—';
+        $('lbiFolder').textContent = '—';
+      });
+  }
+  function hideProperties() {
+    $('lbInfoPanel').classList.add('hidden');
+    $('lbInfo').classList.remove('active');
+  }
+  function toggleProperties() {
+    if ($('lbInfoPanel').classList.contains('hidden')) showProperties();
+    else hideProperties();
+  }
+
   $('lbClose').onclick = closeLightbox;
   $('lbPrev').onclick = () => navLightbox(-1);
   $('lbNext').onclick = () => navLightbox(1);
+  $('lbInfo').onclick = toggleProperties;
   $('lbFolder').onclick = async () => {
     const m = media[lightboxIndex];
     if (!m) return;
@@ -587,13 +699,7 @@
       body: JSON.stringify({ hash: m.hash }),
     }).catch(() => {});
   };
-  $('lbDelete').onclick = async () => {
-    const m = media[lightboxIndex];
-    if (!m) return;
-    if (!confirm("Delete this item from this computer's backup?")) return;
-    closeLightbox();
-    await deleteHashes([m.hash]);
-  };
+  $('lbDelete').onclick = deleteCurrent;
   $('lightbox').addEventListener('click', (e) => {
     if (e.target.id === 'lightbox') closeLightbox();
   });
@@ -602,6 +708,17 @@
     if (e.key === 'Escape') closeLightbox();
     else if (e.key === 'ArrowLeft') navLightbox(-1);
     else if (e.key === 'ArrowRight') navLightbox(1);
+    else if (e.key === 'Delete') deleteCurrent();
+    else if (e.key === 'i' || e.key === 'I') toggleProperties();
+  });
+  // Grid: Delete removes the current selection (viewer closed, Photos tab).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Delete') return;
+    if (activeTab !== 'photos') return;
+    if (!$('lightbox').classList.contains('hidden')) return; // viewer handles its own Delete
+    if (selected.size === 0) return;
+    e.preventDefault();
+    deleteSelected();
   });
 
   // ---- trash (recycle bin) -------------------------------------------------
