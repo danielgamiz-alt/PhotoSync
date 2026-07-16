@@ -423,8 +423,8 @@
   // Tiles are uniform squares, so each section's pixel height is known from its
   // photo count without laying the tiles out. We reserve that height, then
   // mount/unmount each section's tiles as it enters/leaves an expanded viewport.
-  const GRID_GAP = 4;   // must match .day-grid `gap` in gallery.css
-  const MIN_TILE = 160; // must match .day-grid minmax(160px, …) in gallery.css
+  const GRID_GAP = 8;   // must match .day-grid `gap` in gallery.css
+  const MIN_TILE = 220; // must match .day-grid minmax(220px, …) in gallery.css
 
   function computeLayout() {
     const grid = $('gallery').querySelector('.day-grid');
