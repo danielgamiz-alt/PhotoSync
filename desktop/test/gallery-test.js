@@ -323,6 +323,34 @@ async function main() {
     const metaMissing = await fetch(`${BASE}/api/media/meta?hash=deadbeef`);
     check('meta: missing → 404', metaMissing.status === 404);
 
+    // ---- ThumbHash placeholders ------------------------------------------
+    // Server derives a ~25-byte perceptual hash from the 256px thumbnail and
+    // serves it inline in /api/media so the client paints an instant, request-
+    // free placeholder. Verify: generation, round-trip decode, and delivery.
+    if (sharpOk) {
+      const sharp = require('sharp');
+      const { Readable } = require('stream');
+      const src = await sharp({ create: { width: 400, height: 300, channels: 3, background: { r: 120, g: 60, b: 30 } } }).png().toBuffer();
+      const stored = await storage.store(Readable.from(src), { filename: 'th.png', takenAt: Date.UTC(2026, 0, 2) });
+      const abs = path.join(dir, stored.path);
+      await thumbnailer.thumb(stored.hash, abs, 'image', 256); // ThumbHash derives from this
+      await thumbnailer._ensureThumbHash(stored.hash);
+      const th = thumbnailer.thumbHashFor(stored.hash);
+      check('thumbhash: computed from thumbnail', typeof th === 'string' && th.length > 10, `${th}`);
+      const listed = await fetch(`${BASE}/api/media?account=all`).then((r) => r.json());
+      const item = listed.items.find((m) => m.hash === stored.hash);
+      check('thumbhash: served inline in /api/media', !!item && item.th === th);
+      const { thumbHashToDataURL } = require('thumbhash');
+      const url = thumbHashToDataURL(Buffer.from(th, 'base64'));
+      check('thumbhash: decodes to a PNG data URL', typeof url === 'string' && url.startsWith('data:image/png'));
+      // forget() drops the ThumbHash too, so a deleted photo leaves none behind.
+      await thumbnailer.forget(stored.hash);
+      check('thumbhash: forget() removes it', thumbnailer.thumbHashFor(stored.hash) === null);
+      await storage.remove(stored.hash);
+    } else {
+      console.log('  skip thumbhash (sharp not installed)');
+    }
+
     // missing hash
     const missing = await fetch(`${BASE}/media/file?hash=deadbeef`);
     check('file: missing → 404', missing.status === 404);

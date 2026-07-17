@@ -78,7 +78,16 @@ async function route(req, res, deps) {
     // account=<name> → just that account; account=all → everyone (dupes kept);
     // omitted → everyone (the client then picks a default account).
     const account = url.searchParams.get('account') || '';
-    const items = account && account !== 'all' ? all.filter((m) => m.user === account) : all;
+    const filtered = account && account !== 'all' ? all.filter((m) => m.user === account) : all;
+
+    // Attach each item's ThumbHash (when computed) so the client can paint an
+    // instant placeholder with no extra request. `th` is omitted when absent so
+    // the list stays lean until warmup fills them in.
+    const hasTh = typeof deps.thumbnailer.thumbHashFor === 'function';
+    const items = filtered.map((m) => {
+      const th = hasTh ? deps.thumbnailer.thumbHashFor(m.hash) : null;
+      return th ? { ...m, th } : m;
+    });
 
     return sendJson(res, 200, { items, accounts, thumbnails: deps.thumbnailer.available, rev: storage.rev });
   }

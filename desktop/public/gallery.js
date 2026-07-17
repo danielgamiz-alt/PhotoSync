@@ -228,9 +228,13 @@
         <div class="tile-check">✓</div>
       </div>`;
     }
-    // Blur placeholders come from a dedicated endpoint (browser-cached) rather
-    // than inline data URIs, so the /api/media poll stays small on big libraries.
-    const blurAttr = thumbsAvailable ? ` data-blur="/media/blur?hash=${m.hash}"` : '';
+    // Instant placeholder. Prefer the ThumbHash (`m.th`) — a ~25-byte string,
+    // already in the media list, that decodes to a recognisable blur ON THE
+    // CLIENT with no request at all. Only fall back to the /media/blur endpoint
+    // (an extra fetch per tile) for items whose ThumbHash hasn't been computed
+    // yet. `th` is HTML-safe base64 (A–Z a–z 0–9 + / =).
+    const thAttr = m.th ? ` data-th="${m.th}"` : '';
+    const blurAttr = (!m.th && thumbsAvailable) ? ` data-blur="/media/blur?hash=${m.hash}"` : '';
     // Responsive grid thumbnail: the browser picks 256w (1×) or 512w (2×/retina)
     // from the tile's CSS width (`sizes`). Both srcset and src stay in data-*
     // attributes until the tile nears the viewport (see the lazy loader), so
@@ -244,7 +248,7 @@
     const base = `/media/thumb?hash=${m.hash}&amp;v=2`;
     const srcset = `${base}&amp;w=256 256w, ${base}&amp;w=512 512w`;
     return `<div class="tile" data-index="${i}" data-hash="${m.hash}">
-      <img${blurAttr} data-src="${base}&amp;w=256" data-srcset="${srcset}" sizes="${tileH || 256}px" alt="">
+      <img${thAttr}${blurAttr} data-src="${base}&amp;w=256" data-srcset="${srcset}" sizes="${tileH || 256}px" alt="">
       <div class="tile-check">✓</div>
     </div>`;
   }
@@ -321,6 +325,22 @@
   }
   let tileObserver = null;
   let sectionObserver = null;
+  // A tile's instant placeholder: the ThumbHash decoded to a data URL (no
+  // request), memoised so re-scrolling the same tiles doesn't re-decode. Falls
+  // back to the /media/blur URL for tiles whose ThumbHash isn't computed yet.
+  const thumbHashCache = new Map();
+  function placeholderFor(el) {
+    const th = el.dataset.th;
+    if (th) {
+      let url = thumbHashCache.get(th);
+      if (url === undefined) {
+        url = typeof thumbHashToDataURL === 'function' ? thumbHashToDataURL(th) : null;
+        thumbHashCache.set(th, url);
+      }
+      if (url) return url;
+    }
+    return el.dataset.blur || null;
+  }
   function loadTileMedia(el) {
     const src = el.dataset.src;
     if (!src || el.getAttribute('src') === src) return;
@@ -332,22 +352,22 @@
       el.setAttribute('src', src);
       return;
     }
-    // Paint the tiny blur placeholder (browser-cached, ~0.5 KB) so the tile is
-    // never blank while the full thumbnail loads via the queue — but only for
-    // tiles the user can (almost) see. Blur requests skip the thumb queue and
-    // go straight to the network, so firing them for the whole preload band
-    // (~100 tiles after a fling) would occupy every browser connection ahead
-    // of the visible tiles' thumbnails.
-    const blur = el.dataset.blur;
-    if (nearViewport && blur && el.getAttribute('src') !== blur) {
-      el.setAttribute('src', blur);
+    // Paint the instant placeholder so the tile is never blank while the full
+    // thumbnail loads via the queue — but only for tiles the user can (almost)
+    // see. A ThumbHash placeholder is free (client-side decode); the /media/blur
+    // fallback is a network fetch, so firing it for the whole preload band
+    // (~100 tiles after a fling) would occupy every browser connection ahead of
+    // the visible tiles' thumbnails.
+    const placeholder = nearViewport ? placeholderFor(el) : null;
+    if (placeholder && el.getAttribute('src') !== placeholder) {
+      el.setAttribute('src', placeholder);
       el.classList.add('thumb-blur');
     }
     enqueueThumb(el, src, nearViewport);
   }
   function unloadTileMedia(el) {
     pendingTiles.delete(el); // a tile leaving the band must not load on settle
-    const blurSrc = el.dataset.blur;
+    const blurSrc = placeholderFor(el);
     if (el.tagName === 'VIDEO') {
       if (!el.hasAttribute('src')) return;
       el.removeAttribute('src');

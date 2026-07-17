@@ -15,7 +15,19 @@ try {
   sharp = null;
 }
 
+// ThumbHash: a ~25-byte perceptual hash the client decodes into an instant,
+// recognisable blurred placeholder — no per-tile /media/blur request. Pure JS,
+// so it also ships to the Android client via the same /api/media field.
+let rgbaToThumbHash = null;
+try {
+  ({ rgbaToThumbHash } = require('thumbhash'));
+} catch {
+  rgbaToThumbHash = null;
+}
+
 const THUMB_DIR = '.thumbs';
+const THUMBHASH_FILE = 'thumbhashes.json'; // { <contentHash>: <base64 ThumbHash> }
+const THUMBHASH_MAX = 100; // ThumbHash needs a source no larger than 100px/side
 const BLUR_SIZE = 12;
 const WARM_CONCURRENCY = 3;
 
@@ -74,6 +86,9 @@ class Thumbnailer {
     this._heicQueue = [];         // entries waiting for a worker (urgent ones first)
     this._heicPending = new Map(); // hash -> queued/running entry, for coalescing
     this._lastUrgentAt = 0;       // when the gallery last asked for something
+    this._thumbHashes = null;     // hash -> base64 ThumbHash, lazily loaded
+    this._thumbHashDirty = false; // pending unsaved ThumbHash changes
+    this._thumbHashTimer = null;  // debounced persist timer
   }
 
   get available() {
@@ -351,6 +366,83 @@ class Thumbnailer {
       }
     }
     await Promise.all(pool.map((s) => s.worker.terminate().catch(() => {})));
+    await this._flushThumbHashes();
+  }
+
+  // ---- ThumbHash placeholders ----------------------------------------------
+  // Computed from the already-generated 256px WebP thumbnail (not the original),
+  // so it's cheap and format-agnostic — no HEIC decode needed just for the hash.
+  // The map lives in one JSON file beside the thumbnails and is served inline in
+  // /api/media so tiles get an instant placeholder with zero extra requests.
+
+  _thumbHashFile() {
+    return path.join(this.getRoot(), THUMB_DIR, THUMBHASH_FILE);
+  }
+
+  _loadThumbHashes() {
+    if (this._thumbHashes) return this._thumbHashes;
+    try {
+      this._thumbHashes = new Map(Object.entries(JSON.parse(fs.readFileSync(this._thumbHashFile(), 'utf8'))));
+    } catch {
+      this._thumbHashes = new Map(); // no file yet, or corrupt — start fresh
+    }
+    return this._thumbHashes;
+  }
+
+  /** The stored base64 ThumbHash for a content hash, or null if not computed yet. */
+  thumbHashFor(hash) {
+    return this._loadThumbHashes().get(hash) || null;
+  }
+
+  /**
+   * Ensure a ThumbHash exists for `hash`, deriving it from the cached 256px
+   * thumbnail. No-op if already present or the thumbnail isn't there. Persist is
+   * debounced so warming tens of thousands of items doesn't thrash the disk.
+   */
+  async _ensureThumbHash(hash) {
+    if (!sharp || !rgbaToThumbHash) return;
+    const map = this._loadThumbHashes();
+    if (map.has(hash)) return;
+    const thumb = this._thumbPath(hash, THUMB_SIZES[0]);
+    try {
+      // Read into a buffer rather than sharp(path): on Windows libvips keeps the
+      // file mmap'd until GC, which blocks a later delete of the thumbnail.
+      const bytes = await fsp.readFile(thumb);
+      const { data, info } = await sharp(bytes)
+        .resize(THUMBHASH_MAX, THUMBHASH_MAX, { fit: 'inside' })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const hashBytes = rgbaToThumbHash(info.width, info.height, data);
+      map.set(hash, Buffer.from(hashBytes).toString('base64'));
+      this._thumbHashDirty = true;
+      this._scheduleThumbHashPersist();
+    } catch {
+      // Thumbnail missing or unreadable — skip; the tile falls back to no
+      // placeholder, and a later warmup pass can pick it up.
+    }
+  }
+
+  _scheduleThumbHashPersist() {
+    if (this._thumbHashTimer) return;
+    this._thumbHashTimer = setTimeout(() => {
+      this._thumbHashTimer = null;
+      this._flushThumbHashes().catch(() => {});
+    }, 4000);
+    if (this._thumbHashTimer.unref) this._thumbHashTimer.unref();
+  }
+
+  async _flushThumbHashes() {
+    if (this._thumbHashTimer) { clearTimeout(this._thumbHashTimer); this._thumbHashTimer = null; }
+    if (!this._thumbHashDirty || !this._thumbHashes) return;
+    this._thumbHashDirty = false;
+    const obj = Object.fromEntries(this._thumbHashes);
+    try {
+      await fsp.mkdir(path.dirname(this._thumbHashFile()), { recursive: true });
+      await fsp.writeFile(this._thumbHashFile(), JSON.stringify(obj));
+    } catch {
+      this._thumbHashDirty = true; // retry on the next change
+    }
   }
 
   /**
@@ -366,13 +458,12 @@ class Thumbnailer {
     if (!sharp) return;
     this._warmupAbort = false;
     const root = this.getRoot();
-    // Cheap-to-decode formats first: the JPEG bulk of the library warms at
-    // ~100ms/image, while each HEIC costs ~1s of WASM decode — front-loading
-    // JPEGs gets most of the grid covered quickly and leaves the slow HEIC tail
-    // for later (on-demand requests preempt it via the urgent queue anyway).
-    const imageItems = items
-      .filter((m) => m.type !== 'video')
-      .sort((a, b) => Number(isHeic(a.path)) - Number(isHeic(b.path)));
+    // Newest first: `items` arrives newest-first (storage.list sorts by capture
+    // date), and that's the order the gallery shows on open, so warming in the
+    // same order makes the first screens the user actually sees ready soonest —
+    // including their HEICs, instead of parking every HEIC behind the whole JPEG
+    // backlog. The worker pool + urgent-queue preemption keep HEIC cost in check.
+    const imageItems = items.filter((m) => m.type !== 'video');
 
     let i = 0;
     const worker = async () => {
@@ -395,6 +486,10 @@ class Thumbnailer {
         // copies for the whole library would bloat the cache upfront.
         const jobs = this._missingGridJobs(m.hash);
         if (jobs.length) await this._render(m.hash, abs, jobs, false);
+        // Derive the instant placeholder from the (now-cached) 256px thumbnail.
+        // Runs for already-warmed items too, so re-opening backfills ThumbHashes
+        // for a library warmed before this feature existed.
+        await this._ensureThumbHash(m.hash);
       }
     };
 
@@ -445,6 +540,10 @@ class Thumbnailer {
       path.join(dir, `${hash}-b.jpg`),
     ];
     await Promise.all(files.map((f) => fsp.unlink(f).catch(() => {})));
+    if (this._loadThumbHashes().delete(hash)) {
+      this._thumbHashDirty = true;
+      this._scheduleThumbHashPersist();
+    }
   }
 }
 
