@@ -38,6 +38,7 @@
     if (tab !== 'photos') $('selectionBar').classList.add('hidden');
     else if (selected.size > 0) $('selectionBar').classList.remove('hidden');
     if (tab === 'trash') loadTrash();
+    if (typeof refreshScrubber === 'function') refreshScrubber();
   }
   $('tabPhotos').onclick = () => showTab('photos');
   $('tabTrash').onclick = () => showTab('trash');
@@ -175,6 +176,7 @@
     if (media.length === 0) {
       root.innerHTML = '';
       groups = [];
+      refreshScrubber(); // nothing to scrub → hides the rail
       return;
     }
 
@@ -212,6 +214,7 @@
     reserveHeights();
     observeSections();
     applySelectionClasses();
+    refreshScrubber();
   }
 
   function renderTile(i) {
@@ -527,8 +530,131 @@
           .querySelectorAll('#gallery .tile img[data-srcset]')
           .forEach((img) => { img.sizes = tileH + 'px'; });
       }
+      refreshScrubber();
     }, 150);
   });
+
+  // ---- date scrubber (Google Photos-style timeline rail) -------------------
+  // A fixed rail on the right edge that maps scroll position <-> capture date.
+  // Drag it (or hover) to jump to a month/year; it also tracks normal scrolling.
+  // Built from `groups` (each a dated section) and their reserved heights, so it
+  // needs no extra data and stays correct however sections mount/unmount.
+  const scroller = document.querySelector('main');
+  let scrubberEl = null, scrubHit, scrubYears, scrubThumb, scrubBubble;
+  let scrubMarks = [];     // [{ top, ms }] per day-section (top = its scroll offset)
+  let scrubMax = 1;        // maxScroll = scrollHeight - clientHeight
+  let scrubDragging = false, scrubHideTimer = null;
+
+  function buildScrubber() {
+    scrubberEl = document.createElement('div');
+    scrubberEl.className = 'scrubber hidden';
+    scrubberEl.innerHTML =
+      '<div class="scrub-years"></div><div class="scrub-thumb"></div>' +
+      '<div class="scrub-bubble"></div><div class="scrub-hit"></div>';
+    document.body.appendChild(scrubberEl);
+    scrubYears = scrubberEl.querySelector('.scrub-years');
+    scrubThumb = scrubberEl.querySelector('.scrub-thumb');
+    scrubBubble = scrubberEl.querySelector('.scrub-bubble');
+    scrubHit = scrubberEl.querySelector('.scrub-hit');
+    scrubHit.addEventListener('pointerdown', (e) => {
+      scrubDragging = true;
+      try { scrubHit.setPointerCapture(e.pointerId); } catch { /* keep going even if capture is unavailable */ }
+      clearTimeout(scrubHideTimer);
+      scrubTo(e.clientY);
+      e.preventDefault();
+    });
+    scrubHit.addEventListener('pointermove', (e) => {
+      if (scrubDragging) { scrubTo(e.clientY); return; }
+      const rect = scrubberEl.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      revealScrub();
+      showScrubBubble(y, dateAtScroll((y / rect.height) * scrubMax));
+    });
+    scrubHit.addEventListener('pointerup', () => { scrubDragging = false; hideScrubSoon(700); });
+    scrubHit.addEventListener('pointerleave', () => { if (!scrubDragging) hideScrubSoon(400); });
+    // Track normal scrolling: move the thumb and flash the current date.
+    scroller.addEventListener('scroll', () => {
+      if (!scrubberEl || scrubberEl.classList.contains('hidden')) return;
+      updateScrubThumb();
+      if (!scrubDragging) {
+        revealScrub();
+        showScrubBubble((scroller.scrollTop / scrubMax) * scrubberEl.clientHeight, dateAtScroll(scroller.scrollTop));
+        hideScrubSoon(900);
+      }
+    }, { passive: true });
+  }
+
+  function fmtScrubDate(ms) {
+    return ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '';
+  }
+  function dateAtScroll(st) {
+    let ms = scrubMarks.length ? scrubMarks[0].ms : 0;
+    for (const mk of scrubMarks) { if (mk.top <= st + 4) ms = mk.ms; else break; }
+    return ms;
+  }
+  function updateScrubThumb() {
+    scrubThumb.style.top = (Math.min(1, scroller.scrollTop / scrubMax) * scrubberEl.clientHeight) + 'px';
+  }
+  function showScrubBubble(railY, ms) {
+    const railH = scrubberEl.clientHeight;
+    scrubBubble.style.top = Math.max(16, Math.min(railH - 16, railY)) + 'px';
+    scrubBubble.textContent = fmtScrubDate(ms);
+  }
+  function revealScrub() { clearTimeout(scrubHideTimer); scrubberEl.classList.add('scrubbing'); }
+  function hideScrubSoon(delay) {
+    clearTimeout(scrubHideTimer);
+    scrubHideTimer = setTimeout(() => scrubberEl.classList.remove('scrubbing'), delay);
+  }
+  function scrubTo(clientY) {
+    const rect = scrubberEl.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    scroller.scrollTop = f * scrubMax;
+    updateScrubThumb();
+    revealScrub();
+    showScrubBubble(f * rect.height, dateAtScroll(f * scrubMax));
+  }
+
+  // Rebuild the rail's markers from the current sections. Cheap: one layout pass
+  // for all the section rects, then string-built labels. Call after a render,
+  // resize, or tab switch.
+  function refreshScrubber() {
+    if (!scrubberEl) buildScrubber();
+    const days = activeTab === 'photos' ? Array.from($('gallery').querySelectorAll('.day')) : [];
+    scrubMax = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+    if (days.length < 2 || scrubMax < 400) {
+      scrubberEl.classList.add('hidden');
+      document.body.classList.remove('has-scrubber');
+      return;
+    }
+    const sr = scroller.getBoundingClientRect();
+    scrubberEl.style.top = sr.top + 'px';
+    scrubberEl.style.height = sr.height + 'px';
+    const sTop = sr.top, sScroll = scroller.scrollTop;
+    scrubMarks = days.map((d) => {
+      const g = groups[+d.dataset.gi];
+      return {
+        top: d.getBoundingClientRect().top - sTop + sScroll,
+        ms: g && g.items.length ? media[g.items[0]].takenAt : 0,
+      };
+    });
+    const railH = sr.height;
+    let yHtml = '', tHtml = '', lastYear = null, lastMonth = null;
+    for (const mk of scrubMarks) {
+      if (!mk.ms) continue;
+      const d = new Date(mk.ms);
+      const y = Math.min(1, mk.top / scrubMax) * railH;
+      const ym = d.getFullYear() * 12 + d.getMonth();
+      if (ym !== lastMonth) { lastMonth = ym; tHtml += `<div class="scrub-tick" style="top:${y}px"></div>`; }
+      if (d.getFullYear() !== lastYear) {
+        lastYear = d.getFullYear();
+        yHtml += `<div class="scrub-year" style="top:${y}px">${lastYear}</div>`;
+      }
+    }
+    scrubYears.innerHTML = tHtml + yHtml;
+    updateScrubThumb();
+    scrubberEl.classList.remove('hidden');
+    document.body.classList.add('has-scrubber');
+  }
 
   // ---- selection -----------------------------------------------------------
   function toggleOne(hash) {
