@@ -59,6 +59,21 @@
   }
   .shots figcaption { color: var(--muted); font-size: 12px; margin-top: 10px; text-align: center; }
 
+  /* Server dashboard screenshot (the "on your PC" half) */
+  .server-shot { margin: 26px auto 0; max-width: 580px; }
+  .server-shot .winbar {
+    display: flex; align-items: center; gap: 7px; padding: 9px 13px;
+    background: #17171c; border: 1px solid var(--border); border-bottom: none;
+    border-radius: 12px 12px 0 0;
+  }
+  .server-shot .winbar i { width: 11px; height: 11px; border-radius: 50%; background: #3a3a44; }
+  .server-shot img {
+    display: block; width: 100%; height: auto;
+    border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.45);
+  }
+  .server-shot figcaption { color: var(--muted); font-size: 12px; margin-top: 10px; text-align: center; }
+
   /* QR */
   .qr { margin: 28px auto 0; text-align: center; }
   .qr .card { background: #fff; display: inline-block; padding: 12px; border-radius: 14px; }
@@ -164,6 +179,13 @@
         <figcaption>“Backed up to PC” on each one</figcaption>
       </figure>
     </div>
+
+    <!-- The other half: the free server on your PC -->
+    <figure class="server-shot">
+      <div class="winbar"><i></i><i></i><i></i></div>
+      <img src="screenshot-server.png" alt="The PhotoSync Server dashboard on a Windows PC, showing photos organised by day with a green 'Running' status" loading="lazy">
+      <figcaption>…and on your PC: every photo, sorted by day — stored only on your computer.</figcaption>
+    </figure>
 
     <div class="qr">
       <div class="card"><div id="qrcode"></div></div>
